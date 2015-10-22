@@ -1,6 +1,8 @@
 Copyright (c) 2010-2011 Joshua Harlan Lifton.
 See LICENSE.txt for details.
 
+`Haga clic aquí para leer esta página en Español <README_es.rst>`_
+
 Plover: Open Source Stenography Software
 ========================================
 
