@@ -108,6 +108,16 @@ DEFAULT_KEYBOARD_CONFIG_FRAME_X = -1
 KEYBOARD_CONFIG_FRAME_Y_OPTION = 'y'
 DEFAULT_KEYBOARD_CONFIG_FRAME_Y = -1
 
+MULTIPLE_OUTPUT_CONFIG_SECTION = 'Multiple Output Configuration'
+DEFAULT_MULTIPLE_OUTPUT = False
+MULTIPLE_OUTPUT_OPTION = 'multiple_output'
+SECOND_OUTPUT_TRANSLATED = 'second_output_translated'
+DEFAULT_SECOND_OUTPUT_TRANSLATED = False
+SECOND_OUTPUT_DICTIONARY_ORDER_REVERSED = 'second_output_dict_order_reversed'
+DEFAULT_SECOND_OUTPUT_DICTIONARY_ORDER_REVERSED = True
+SECOND_OUTPUT_LOCATION = 'second_output_location'
+DEFAULT_SECOND_OUTPUT_LOCATION = ''
+
 # Dictionary constants.
 JSON_EXTENSION = '.json'
 RTF_EXTENSION = '.rtf'
@@ -420,6 +430,42 @@ class Config(object):
         return self._get_int(KEYBOARD_CONFIG_FRAME_SECTION, 
                              KEYBOARD_CONFIG_FRAME_Y_OPTION,
                              DEFAULT_KEYBOARD_CONFIG_FRAME_Y)
+
+    def set_multiple_output(self, multiple_output):
+        self._set(MULTIPLE_OUTPUT_CONFIG_SECTION, MULTIPLE_OUTPUT_OPTION,
+                  multiple_output)
+
+    def get_multiple_output(self):
+        return self._get_bool(MULTIPLE_OUTPUT_CONFIG_SECTION, 
+                              MULTIPLE_OUTPUT_OPTION,
+                              DEFAULT_MULTIPLE_OUTPUT)
+
+    def set_second_output_translated(self, translated):
+        self._set(MULTIPLE_OUTPUT_CONFIG_SECTION, SECOND_OUTPUT_TRANSLATED,
+                  translated)
+
+    def get_second_output_translated(self):
+        return self._get_bool(MULTIPLE_OUTPUT_CONFIG_SECTION,
+                              SECOND_OUTPUT_TRANSLATED,
+                              DEFAULT_SECOND_OUTPUT_TRANSLATED)
+
+    def set_second_output_dictionary_order_reversed(self, order_reversed):
+        self._set(MULTIPLE_OUTPUT_CONFIG_SECTION, SECOND_OUTPUT_DICTIONARY_ORDER_REVERSED,
+                  order_reversed)
+
+    def get_second_output_dictionary_order_reversed(self):
+        return self._get_bool(MULTIPLE_OUTPUT_CONFIG_SECTION,
+                              SECOND_OUTPUT_DICTIONARY_ORDER_REVERSED,
+                              DEFAULT_SECOND_OUTPUT_DICTIONARY_ORDER_REVERSED)
+
+    def set_second_output_location(self, location):
+        self._set(MULTIPLE_OUTPUT_CONFIG_SECTION, SECOND_OUTPUT_LOCATION,
+                  location)
+
+    def get_second_output_location(self):
+        return self._get(MULTIPLE_OUTPUT_CONFIG_SECTION,
+                         SECOND_OUTPUT_LOCATION,
+                         DEFAULT_SECOND_OUTPUT_LOCATION)
 
     def _set(self, section, option, value):
         if not self._config.has_section(section):

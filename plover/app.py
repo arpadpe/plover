@@ -33,6 +33,7 @@ import plover.dictionary.rtfcre_dict as rtfcre_dict
 from plover.machine.registry import machine_registry, NoSuchMachineException
 from plover.logger import Logger
 from plover.dictionary.loading_manager import manager as dict_manager
+import inspect
 
 # Because 2.7 doesn't have this yet.
 class SimpleNamespace(object):
@@ -54,6 +55,12 @@ def init_engine(engine, config):
     except DictionaryLoaderException as e:
         raise InvalidConfigurationError(unicode(e))
     engine.get_dictionary().set_dicts(dicts)
+
+    if engine.multipleoutput and config.get_second_output_translated():
+        if config.get_second_output_dictionary_order_reversed():
+            engine.get_second_translator_dictionary().set_dicts(dicts[::-1])
+        else:
+            engine.get_second_translator_dictionary().set_dicts(dicts)
 
     log_file_name = config.get_log_file_name()
     if log_file_name:
@@ -149,7 +156,7 @@ class StenoEngine(object):
 
     """
 
-    def __init__(self, thread_hook=same_thread_hook):
+    def __init__(self, multipleoutput, thread_hook=same_thread_hook):
         """Creates and configures a single steno pipeline."""
         self.subscribers = []
         self.stroke_listeners = []
@@ -166,7 +173,17 @@ class StenoEngine(object):
         # be parameterized.
         self.translator.set_min_undo_length(10)
 
+        self.multipleoutput = multipleoutput
+        if self.multipleoutput:
+            self.formatter2 = formatting.Formatter()
+            self.translator2 = translation.Translator()
+            #self.translator2 = self.translator
+            self.translator2.add_listener(self.logger.log_translation)
+            self.translator2.add_listener(self.formatter2.format)
+            self.translator2.set_min_undo_length(10)
+
         self.full_output = SimpleNamespace()
+        self.second_output = SimpleNamespace()
         self.command_only_output = SimpleNamespace()
         self.running_state = self.translator.get_state()
         self.set_is_running(False)
@@ -194,14 +211,23 @@ class StenoEngine(object):
     def get_dictionary(self):
         return self.translator.get_dictionary()
 
+    def get_second_translator_dictionary(self):
+        return self.translator2.get_dictionary()
+
     def set_is_running(self, value):
         self.is_running = value
         if self.is_running:
             self.translator.set_state(self.running_state)
             self.formatter.set_output(self.full_output)
+            if self.multipleoutput:
+                self.translator2.set_state(self.running_state)
+                self.formatter2.set_output(self.second_output)
         else:
             self.translator.clear_state()
             self.formatter.set_output(self.command_only_output)
+            if self.multipleoutput:
+                self.translator2.clear_state()
+                self.formatter2.set_output(self.command_only_output)
         if isinstance(self.machine, plover.machine.sidewinder.Stenotype):
             self.machine.suppress_keyboard(self.is_running)
         for callback in self.subscribers:
@@ -213,6 +239,12 @@ class StenoEngine(object):
         self.full_output.send_key_combination = o.send_key_combination
         self.full_output.send_engine_command = o.send_engine_command
         self.command_only_output.send_engine_command = o.send_engine_command
+
+    def set_second_output(self, o):
+        self.second_output.send_backspaces = o.send_backspaces
+        self.second_output.send_string = o.send_string
+        self.second_output.send_key_combination = o.send_key_combination
+        self.second_output.send_engine_command = o.send_engine_command
 
     def destroy(self):
         """Halts the stenography capture-translate-format-display pipeline.
@@ -262,6 +294,8 @@ class StenoEngine(object):
     def _translate_stroke(self, s):
         stroke = steno.Stroke(s)
         self.translator.translate(stroke)
+        if self.multipleoutput:
+            self.translator2.translate(stroke)
         for listener in self.stroke_listeners:
             listener(stroke)
 

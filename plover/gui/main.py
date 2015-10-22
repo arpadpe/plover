@@ -18,6 +18,7 @@ from plover.gui.config import ConfigurationDialog
 import plover.gui.add_translation
 import plover.gui.lookup
 from plover.oslayer.keyboardcontrol import KeyboardEmulation
+from plover.oslayer.outputcontrol import OutputHandler
 from plover.machine.base import STATE_ERROR, STATE_INITIALIZING, STATE_RUNNING
 from plover.machine.registry import machine_registry
 from plover.exception import InvalidConfigurationError
@@ -171,11 +172,16 @@ class MainFrame(wx.Frame):
             self._show_alert(unicode(e))
             self.config.clear()
 
-        self.steno_engine = app.StenoEngine()
+        multipleoutput = self.config.get_multiple_output()
+
+        self.steno_engine = app.StenoEngine(multipleoutput)
         self.steno_engine.add_callback(
             lambda s: wx.CallAfter(self._update_status, s))
         self.steno_engine.set_output(
             Output(self.consume_command, self.steno_engine))
+        secondoutput = SecondOutput(self.consume_command, self.steno_engine)
+        secondoutput.set_output_location(self.config.get_second_output_location())
+        self.steno_engine.set_second_output(secondoutput)
 
         while True:
             try:
@@ -330,6 +336,30 @@ class Output(object):
 
     def send_key_combination(self, c):
         wx.CallAfter(self.keyboard_control.send_key_combination, c)
+
+    # TODO: test all the commands now
+    def send_engine_command(self, c):
+        result = self.engine_command_callback(c)
+        if result and not self.engine.is_running:
+            self.engine.machine.suppress = self.send_backspaces
+
+class SecondOutput(object):
+    def __init__(self, engine_command_callback, engine):
+        self.engine_command_callback = engine_command_callback
+        self.output_control = OutputHandler()
+        self.engine = engine
+
+    def set_output_location(self, windowname):
+        self.output_control.set_output_location(windowname)
+
+    def send_backspaces(self, b):
+        wx.CallAfter(self.output_control.send_backspaces, b)
+
+    def send_string(self, t):
+        wx.CallAfter(self.output_control.send_string, t)
+
+    def send_key_combination(self, c):
+        wx.CallAfter(self.output_control.send_key_combination, c)
 
     # TODO: test all the commands now
     def send_engine_command(self, c):

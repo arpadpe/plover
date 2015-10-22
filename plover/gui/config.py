@@ -22,6 +22,7 @@ from plover.dictionary.loading_manager import manager as dict_manager
 from plover.gui.paper_tape import StrokeDisplayDialog
 from plover.gui.suggestions import SuggestionsDisplayDialog
 from plover.gui.keyboard_config import KeyboardConfigDialog
+from plover.oslayer.outputcontrol import OutputHandler
 
 EDIT_BUTTON_NAME = "Edit"
 ADD_TRANSLATION_BUTTON_NAME = "Add Translation"
@@ -32,6 +33,7 @@ DISPLAY_CONFIG_TAB_NAME = "Display"
 OUTPUT_CONFIG_TAB_NAME = "Output"
 DICTIONARY_CONFIG_TAB_NAME = "Dictionary"
 LOGGING_CONFIG_TAB_NAME = "Logging"
+MULTIPLE_OUTPUT_CONFIG_TAB_NAME = "Multiple Output"
 SAVE_CONFIG_BUTTON_NAME = "Save"
 MACHINE_LABEL = "Stenotype Machine:"
 MACHINE_AUTO_START_LABEL = "Automatically Start"
@@ -100,6 +102,7 @@ class ConfigurationDialog(wx.Dialog):
         self.logging_config = LoggingConfig(self.config, notebook)
         self.display_config = DisplayConfig(self.config, notebook, self.engine)
         self.output_config = OutputConfig(self.config, notebook)
+        self.multiple_output_config = MultipleOutputConfig(self.config, notebook, self.engine)
 
         # Adding each tab
         notebook.AddPage(self.machine_config, MACHINE_CONFIG_TAB_NAME)
@@ -107,6 +110,7 @@ class ConfigurationDialog(wx.Dialog):
         notebook.AddPage(self.logging_config, LOGGING_CONFIG_TAB_NAME)
         notebook.AddPage(self.display_config, DISPLAY_CONFIG_TAB_NAME)
         notebook.AddPage(self.output_config, OUTPUT_CONFIG_TAB_NAME)
+        notebook.AddPage(self.multiple_output_config, MULTIPLE_OUTPUT_CONFIG_TAB_NAME)
 
         sizer.Add(notebook, proportion=1, flag=wx.EXPAND)
 
@@ -163,6 +167,7 @@ class ConfigurationDialog(wx.Dialog):
         self.logging_config.save()
         self.display_config.save()
         self.output_config.save()
+        self.multiple_output_config.save()
 
         try:
             update_engine(self.engine, old_config, self.config)
@@ -534,3 +539,64 @@ class OutputConfig(wx.Panel):
     def save(self):
         """Write all parameters to the config."""
         self.config.set_space_placement(self.choice.GetStringSelection())
+
+class MultipleOutputConfig(wx.Panel):
+
+    MULTIPLE_OUTPUT_TEXT = "Enable multiple output"
+    TRANSLATE_SECOND_OUTPUT_TEXT = "Translate second output"
+    REVERSE_SECOND_OUTPUT_DICTIONARY_ORDER_TEXT = "Reverse second output dictionary order"
+    SECOND_OUTPUT_LOCATION = "Second output location"
+    WINDOWS_DEFAULTS = ["Start", "Clock", "CPU Meter", "Program Manager"]
+    PLOVER_DEFAULTS = ["Plover: running", "Plover: stopped", "Plover: error"]
+
+    """Configure multiple output"""
+    def __init__(self, config, parent, engine):
+        """Create a configuration component based on the given Config.
+
+        Arguments:
+
+        config -- A Config object.
+
+        parent -- This component's parent component.
+
+        """
+        wx.Panel.__init__(self, parent, size=CONFIG_PANEL_SIZE)
+        self.config = config
+        self.engine = engine
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        self.multiple_output = wx.CheckBox(self, label=self.MULTIPLE_OUTPUT_TEXT)
+        self.multiple_output.SetValue(config.get_multiple_output())
+        sizer.Add(self.multiple_output, border=UI_BORDER, 
+                  flag=wx.LEFT | wx.RIGHT | wx.BOTTOM)
+
+        self.translate_second_output = wx.CheckBox(self, label=self.TRANSLATE_SECOND_OUTPUT_TEXT)
+        self.translate_second_output.SetValue(config.get_second_output_translated())
+        sizer.Add(self.translate_second_output, border=UI_BORDER, 
+                  flag=wx.LEFT | wx.RIGHT | wx.BOTTOM)
+
+        self.reverse_second_output_dictionary_order = wx.CheckBox(self, label=self.REVERSE_SECOND_OUTPUT_DICTIONARY_ORDER_TEXT)
+        self.reverse_second_output_dictionary_order.SetValue(config.get_second_output_dictionary_order_reversed())
+        sizer.Add(self.reverse_second_output_dictionary_order, border=UI_BORDER, 
+                  flag=wx.LEFT | wx.RIGHT | wx.BOTTOM)
+
+        self.outputcontrol = OutputHandler()
+
+        windows = self.outputcontrol.get_open_windows();
+
+        box = wx.BoxSizer(wx.HORIZONTAL)
+        box.Add(wx.StaticText(self, label=self.SECOND_OUTPUT_LOCATION),
+                border=COMPONENT_SPACE,
+                flag=wx.ALIGN_RIGHT | wx.ALIGN_CENTER_VERTICAL | wx.RIGHT)
+        self.choice = wx.Choice(self, choices=windows.keys())
+        box.Add(self.choice, proportion=1, flag=wx.EXPAND)
+        sizer.Add(box, border=UI_BORDER, flag=wx.ALL | wx.EXPAND)
+
+        self.SetSizer(sizer)
+
+    def save(self):
+        """Write all parameters to the config."""
+        self.config.set_multiple_output(self.multiple_output.GetValue())
+        self.config.set_second_output_translated(self.translate_second_output.GetValue())
+        self.config.set_second_output_dictionary_order_reversed(self.reverse_second_output_dictionary_order.GetValue())
+        self.config.set_second_output_location(self.choice.GetStringSelection())
