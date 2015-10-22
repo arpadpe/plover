@@ -24,7 +24,7 @@ from plover.gui.suggestions import SuggestionsDisplayDialog
 from plover.gui.keyboard_config import KeyboardConfigDialog
 from plover.oslayer.outputcontrol import OutputHandler
 
-EDIT_BUTTON_NAME = "Edit"
+EDIT_BUTTON_NAME = "Dictionary Editor"
 ADD_TRANSLATION_BUTTON_NAME = "Add Translation"
 ADD_DICTIONARY_BUTTON_NAME = "Add Dictionary"
 LOOKUP_BUTTON_NAME = "Lookup"
