@@ -369,10 +369,6 @@ class KeyboardEmulation(object):
         self._send_key_event(keycode, modifiers, event.KeyPress)
         self._send_key_event(keycode, modifiers, event.KeyRelease)
 
-    def print_parent(self, target_window):
-        print target_window, target_window.get_wm_name(), target_window.get_wm_class()
-        self.print_parent(target_window.query_tree().parent)
-
     def _send_key_event(self, keycode, modifiers, event_class):
         """Simulate a key press or release.
 
