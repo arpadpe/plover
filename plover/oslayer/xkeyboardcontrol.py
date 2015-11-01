@@ -238,7 +238,7 @@ class KeyboardCapture(threading.Thread):
 class KeyboardEmulation(object):
     """Emulate keyboard events."""
 
-    def __init__(self):
+    def __init__(self, target_window_class=None):
         """Prepare to emulate keyboard events."""
         self.display = display.Display()
         self.modifier_mapping = self.display.get_modifier_mapping()
@@ -247,6 +247,7 @@ class KeyboardEmulation(object):
         self.backspace_keycode, mods = self._keysym_to_keycode_and_modifiers(
                                                 backspace_keysym)
         self.time = 0
+        self.target_window_class = target_window_class;
 
     def send_backspaces(self, number_of_backspaces):
         """Emulate the given number of backspaces.
@@ -368,6 +369,10 @@ class KeyboardEmulation(object):
         self._send_key_event(keycode, modifiers, event.KeyPress)
         self._send_key_event(keycode, modifiers, event.KeyRelease)
 
+    def print_parent(self, target_window):
+        print target_window, target_window.get_wm_name(), target_window.get_wm_class()
+        self.print_parent(target_window.query_tree().parent)
+
     def _send_key_event(self, keycode, modifiers, event_class):
         """Simulate a key press or release.
 
@@ -385,7 +390,19 @@ class KeyboardEmulation(object):
         Xlib.protocol.event.KeyRelease.
 
         """
-        target_window = self.display.get_input_focus().focus
+
+        if self.target_window_class is not None:
+            self.win_list = self.display.screen().root.query_tree().children
+            for win in self.win_list:
+                try:
+                    if self.target_window_class == win.query_tree().children[0].query_tree().children[0].get_wm_class():
+                        target_window = win.query_tree().children[0].query_tree().children[0].query_tree().children[0]
+                except IndexError:
+                    # Thrown if a window doesn't have children
+                    pass
+        else:
+            target_window = self.display.get_input_focus().focus
+
         # Make sure every event time is different than the previous one, to
         # avoid an application thinking its an auto-repeat.
         self.time = (self.time + 1) % 4294967295

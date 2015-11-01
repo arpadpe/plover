@@ -11,6 +11,8 @@ import sys
 
 if sys.platform.startswith('win32'):
 	import winoutputhandler as outputhandler
+elif sys.platform.startswith('linux'):
+	import xoutputhandler as outputhandler
 
 class OutputHandler(outputhandler.OutputHandler):
 	"""Choose output location from config"""
