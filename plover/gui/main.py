@@ -80,10 +80,9 @@ class MainFrame(wx.Frame):
 
     def __init__(self, config):
         self.config = config
-        
-        pos = wx.DefaultPosition
-        size = wx.DefaultSize
-        wx.Frame.__init__(self, None, title=self.TITLE, pos=pos, size=size,
+
+        # Note: don't set position from config, since it's not yet loaded.
+        wx.Frame.__init__(self, None, title=self.TITLE,
                           style=wx.DEFAULT_FRAME_STYLE & ~(wx.RESIZE_BORDER |
                                                            wx.RESIZE_BOX |
                                                            wx.MAXIMIZE_BOX))
@@ -157,8 +156,6 @@ class MainFrame(wx.Frame):
         global_sizer.Add(sizer)
         self.SetSizer(global_sizer)
         global_sizer.Fit(self)
-        
-        self.SetRect(AdjustRectToScreen(self.GetRect()))
 
         self.Bind(wx.EVT_CLOSE, self._quit)
         self.Bind(wx.EVT_MOVE, self.on_move)
@@ -175,6 +172,10 @@ class MainFrame(wx.Frame):
         multipleoutput = self.config.get_multiple_output()
 
         self.steno_engine = app.StenoEngine(multipleoutput)
+
+        rect = wx.Rect(config.get_main_frame_x(), config.get_main_frame_y(), *self.GetSize())
+        self.SetRect(AdjustRectToScreen(rect))
+
         self.steno_engine.add_callback(
             lambda s: wx.CallAfter(self._update_status, s))
         self.steno_engine.set_output(
@@ -206,9 +207,6 @@ class MainFrame(wx.Frame):
             SuggestionsDisplayDialog.stroke_handler)
         if self.config.get_show_suggestions_display():
             SuggestionsDisplayDialog.display(self, self.config, self.steno_engine)
-            
-        pos = (config.get_main_frame_x(), config.get_main_frame_y())
-        self.SetPosition(pos)
 
     def consume_command(self, command):
         # The first commands can be used whether plover is active or not.
