@@ -8,8 +8,6 @@ A steno dictionary maps sequences of steno strokes to translations.
 """
 
 import collections
-import itertools
-from steno import normalize_steno
 
 class StenoDictionary(collections.MutableMapping):
     """A steno dictionary.
@@ -27,6 +25,7 @@ class StenoDictionary(collections.MutableMapping):
         self._longest_key_length = 0
         self._longest_listener_callbacks = set()
         self.reverse = collections.defaultdict(list)
+        self.casereverse = collections.defaultdict(set)
         self.filters = []
         self.update(*args, **kw)
         self.save = None
@@ -44,51 +43,32 @@ class StenoDictionary(collections.MutableMapping):
         return self._dict.__iter__()
 
     def __getitem__(self, key):
-        value = self._dict.__getitem__(key)
-        for f in self.filters:
-            if f(key, value):
-                raise KeyError('(%s, %s) is filtered' % (str(key), str(value)))
-        return value
+        return self._dict.__getitem__(key)
 
     def __setitem__(self, key, value):
         self._longest_key = max(self._longest_key, len(key))
-        self._dict.__setitem__(key, value)
+        self._dict[key] = value
         self.reverse[value].append(key)
+        # Case-insensitive reverse dict
+        self.casereverse[value.lower()].add(value)
 
     def __delitem__(self, key):
-        value = self._dict[key]
+        value = self._dict.pop(key)
         self.reverse[value].remove(key)
-        self._dict.__delitem__(key)
         if len(key) == self.longest_key:
             if self._dict:
-                self._longest_key = max(len(x) for x in self._dict.iterkeys())
+                self._longest_key = max(len(x) for x in self._dict)
             else:
                 self._longest_key = 0
 
     def __contains__(self, key):
-        contained = self._dict.__contains__(key)
-        if not contained:
-            return False
-        value = self._dict[key]
-        for f in self.filters:
-            if f(key, value):
-                return False
-        return True
+        return self.get(key) is not None
 
     def set_path(self, path):
         self._path = path    
 
     def get_path(self):
         return self._path    
-
-    def iterkeys(self):
-        return self._dict.iterkeys()
-
-    def itervalues(self):
-        return self._dict.itervalues()
-        
-    def iteritems(self):
-        return self._dict.iteritems()
 
     @property
     def _longest_key(self):
@@ -108,18 +88,9 @@ class StenoDictionary(collections.MutableMapping):
     def remove_longest_key_listener(self, callback):
         self._longest_listener_callbacks.remove(callback)
 
-    def add_filter(self, f):
-        self.filters.append(f)
-        
-    def remove_filter(self, f):
-        self.filters.remove(f)
-    
-    def raw_get(self, key, default):
-        """Bypass filters."""
-        return self._dict.get(key, default)
-
 
 class StenoDictionaryCollection(object):
+
     def __init__(self):
         self.dicts = []
         self.filters = []
@@ -135,38 +106,61 @@ class StenoDictionaryCollection(object):
             d.add_longest_key_listener(self._longest_key_listener)
         self._longest_key_listener()
 
-    def lookup(self, key):
-        for d in self.dicts:
-            value = d.get(key, None)
+    def _lookup(self, key, dicts=None, filters=()):
+        if dicts is None:
+            dicts = self.dicts
+        key_len = len(key)
+        for d in dicts:
+            if key_len > d.longest_key:
+                continue
+            value = d.get(key)
             if value:
-                for f in self.filters:
+                for f in filters:
                     if f(key, value):
                         return None
                 return value
 
+    def lookup(self, key):
+        return self._lookup(key, filters=self.filters)
+
     def raw_lookup(self, key):
-        for d in self.dicts:
-            value = d.get(key, None)
-            if value:
-                return value
+        return self._lookup(key)
 
     def reverse_lookup(self, value):
+        keys = []
+        for n, d in enumerate(self.dicts):
+            for k in d.reverse.get(value, ()):
+                # Ignore key if it's overriden by a higher priority dictionary.
+                if self._lookup(k, dicts=self.dicts[:n]) is None:
+                    keys.append(k)
+        return keys
+
+    def casereverse_lookup(self, value):
         for d in self.dicts:
-            key = d.reverse.get(value, None)
+            key = d.casereverse.get(value)
             if key:
                 return key
 
-    def set(self, key, value):
-        if self.dicts:
-            self.dicts[0][key] = value
+    def set(self, key, value, dictionary=None):
+        if dictionary is None:
+            d = self.dicts[0]
+        else:
+            d = self.get_by_path(dictionary)
+        d[key] = value
 
-    def save(self):
-        if self.dicts:
-            self.dicts[0].save()
+    def save(self, path_list=None):
+        '''Save the dictionaries in <path_list>.
 
-    def save_all(self):
-        for dict in self.dicts:
-            dict.save()
+        If <path_list> is None, all writable dictionaries are saved'''
+        if path_list is None:
+            dict_list = [dictionary
+                         for dictionary in self.dicts
+                         if dictionary.save is not None]
+        else:
+            dict_list = [self.get_by_path(path)
+                         for path in path_list]
+        for dictionary in dict_list:
+            dictionary.save()
 
     def get_by_path(self, path):
         for d in self.dicts:
@@ -186,7 +180,10 @@ class StenoDictionaryCollection(object):
         self.longest_key_callbacks.remove(callback)
     
     def _longest_key_listener(self, ignored=None):
-        new_longest_key = max(d.longest_key for d in self.dicts)
+        if self.dicts:
+            new_longest_key = max(d.longest_key for d in self.dicts)
+        else:
+            new_longest_key = 0
         if new_longest_key != self.longest_key:
             self.longest_key = new_longest_key
             for c in self.longest_key_callbacks:

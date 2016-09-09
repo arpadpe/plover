@@ -1,36 +1,41 @@
+# -*- coding: utf-8 -*-
 # Copyright (c) 2013 Hesky Fisher
 # See LICENSE.txt for details.
 
 "Launch the plover application."
 
+# Python 2/3 compatibility.
+from __future__ import print_function
+
 import os
-import shutil
 import sys
 import traceback
+import argparse
 
-WXVER = '2.8'
+WXVER = '3.0'
 if not hasattr(sys, 'frozen'):
     import wxversion
     wxversion.ensureMinimal(WXVER)
 
+if sys.platform.startswith('darwin'):
+    import appnope
 import wx
-import json
-import glob
-
-from collections import OrderedDict
 
 import plover.gui.main
 import plover.oslayer.processlock
 from plover.oslayer.config import CONFIG_DIR, ASSETS_DIR
-from plover.config import CONFIG_FILE, DEFAULT_DICTIONARY_FILE, Config
+from plover.config import CONFIG_FILE, Config
+from plover import log
+from plover import __name__ as __software_name__
+from plover import __version__
 
 def show_error(title, message):
     """Report error to the user.
 
     This shows a graphical error and prints the same to the terminal.
     """
-    print message
-    app = wx.PySimpleApp()
+    print(message)
+    app = wx.App()
     alert_dialog = wx.MessageDialog(None,
                                     message,
                                     title,
@@ -47,18 +52,7 @@ def init_config_dir():
     if not os.path.exists(CONFIG_DIR):
         os.makedirs(CONFIG_DIR)
 
-    # Copy the default dictionary to the configuration directory.
-    if not os.path.exists(DEFAULT_DICTIONARY_FILE):
-        unified_dict = {}
-        dict_filenames = glob.glob(os.path.join(ASSETS_DIR, '*.json'))
-        for dict_filename in dict_filenames:
-            unified_dict.update(json.load(open(dict_filename, 'rb')))
-        ordered = OrderedDict(sorted(unified_dict.iteritems(), key=lambda x: x[1]))
-        outfile = open(DEFAULT_DICTIONARY_FILE, 'wb')
-        json.dump(ordered, outfile, indent=0, separators=(',', ': '))
-
-    # Create a default configuration file if one doesn't already
-    # exist.
+    # Create a default configuration file if one doesn't already exist.
     if not os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, 'wb') as f:
             f.close()
@@ -66,10 +60,25 @@ def init_config_dir():
 
 def main():
     """Launch plover."""
+    description = "Run the plover stenotype engine. This is a graphical application."
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument('--version', action='version', version='%s %s'
+                        % (__software_name__.capitalize(), __version__))
+    parser.add_argument('-l', '--log-level', choices=['debug', 'info', 'warning', 'error'],
+                        default=None, help='set log level')
+    args = parser.parse_args(args=sys.argv[1:])
+    if args.log_level is not None:
+        log.set_level(args.log_level.upper())
     try:
         # Ensure only one instance of Plover is running at a time.
         with plover.oslayer.processlock.PloverLock():
+            if sys.platform.startswith('darwin'):
+                appnope.nope()
             init_config_dir()
+            # This must be done after calling init_config_dir, so
+            # Plover's configuration directory actually exists.
+            log.setup_logfile()
+            log.info('Plover %s', __version__)
             config = Config()
             config.target_file = CONFIG_FILE
             gui = plover.gui.main.PloverGUI(config)

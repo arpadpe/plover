@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright (c) 2012 Hesky Fisher
 # See LICENSE.txt for details.
 #
@@ -48,17 +47,12 @@ if sys.platform.startswith('win32'):
 else:
     import fcntl
     import os
-    import tempfile
 
 
     class PloverLock(object):
         def __init__(self):
             # Check the environment for items to make the lockfile unique
             # fallback if not found
-            if 'USER' in os.environ:
-                user = os.environ['USER']
-            else:
-                user = "UNKNOWN"
 
             if 'DISPLAY' in os.environ:
                 display = os.environ['DISPLAY'][-1:]
@@ -97,5 +91,5 @@ else:
         def __enter__(self):
             self.acquire()
 
-        def __exit__(self, type, value, traceback):
+        def __exit__(self, exc_type, exc_value, traceback):
             self.release()

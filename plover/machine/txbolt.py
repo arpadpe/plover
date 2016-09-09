@@ -3,6 +3,9 @@
 
 "Thread-based monitoring of a stenotype machine using the TX Bolt protocol."
 
+# Python 2/3 compatibility.
+from six import iterbytes
+
 import plover.machine.base
 
 # In the TX Bolt protocol, there are four sets of keys grouped in
@@ -30,7 +33,7 @@ STENO_KEY_CHART = ("S-", "T-", "K-", "P-", "W-", "H-",  # 00
                    "-T", "-S", "-D", "-Z", "#")         # 11
 
 
-class Stenotype(plover.machine.base.SerialStenotypeBase):
+class TxBolt(plover.machine.base.SerialStenotypeBase):
     """TX Bolt interface.
 
     This class implements the three methods necessary for a standard
@@ -39,8 +42,15 @@ class Stenotype(plover.machine.base.SerialStenotypeBase):
 
     """
 
+    KEYS_LAYOUT = '''
+        #  #  #  #  #  #  #  #  #  #
+        S- T- P- H- * -F -P -L -T -D
+        S- K- W- R- * -R -B -G -S -Z
+              A- O-   -E -U
+    '''
+
     def __init__(self, params):
-        plover.machine.base.SerialStenotypeBase.__init__(self, params)
+        super(TxBolt, self).__init__(params)
         self._reset_stroke_state()
 
     def _reset_stroke_state(self):
@@ -48,34 +58,35 @@ class Stenotype(plover.machine.base.SerialStenotypeBase):
         self._last_key_set = 0
 
     def _finish_stroke(self):
-        self._notify(self._pressed_keys)
+        steno_keys = self.keymap.keys_to_actions(self._pressed_keys)
+        if steno_keys:
+            self._notify(self._pressed_keys)
         self._reset_stroke_state()
 
     def run(self):
         """Overrides base class run method. Do not call directly."""
         settings = self.serial_port.getSettingsDict()
-        settings['timeout'] = 0.1 # seconds
+        settings['timeout'] = 0.015 # seconds
         self.serial_port.applySettingsDict(settings)
         self._ready()
         while not self.finished.isSet():
             # Grab data from the serial port, or wait for timeout if none available.
             raw = self.serial_port.read(max(1, self.serial_port.inWaiting()))
-            
-            # XXX : work around for python 3.1 and python 2.6 differences
-            if isinstance(raw, str):
-                raw = [ord(x) for x in raw]
 
             if not raw and len(self._pressed_keys) > 0:
                 self._finish_stroke()
                 continue
 
-            for byte in raw:
+            for byte in iterbytes(raw):
                 key_set = byte >> 6
                 if (key_set <= self._last_key_set
                     and len(self._pressed_keys) > 0):
                     self._finish_stroke()
                 self._last_key_set = key_set
-                for i in xrange(6):
+                for i in range(6):
                     if (byte >> i) & 1:
                         self._pressed_keys.append(
                             STENO_KEY_CHART[(key_set * 6) + i])
+                if 3 == key_set:
+                    # Last possible set, the stroke is finished.
+                    self._finish_stroke()

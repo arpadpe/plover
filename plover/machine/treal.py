@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright (c) 2013 Hesky Fisher
 # See LICENSE.txt for details.
 
@@ -5,19 +6,25 @@
 
 "Thread-based monitoring of a stenotype machine using the Treal machine."
 
-import sys
+from time import sleep
 
-STENO_KEY_CHART = (('K-', 'W-', 'R-', '*', '-R', '-B', '-G', '-S'),
-                   ('*', '-F', '-P', '-L', '-T', '-D', '', 'S-'),
-                   ('#', '#', '#', '', 'S-', 'T-', 'P-', 'H-'),
-                   ('#', '#', '#', '#', '#', '#', '#', '#'),
-                   ('', '', '-Z', 'A-', 'O-', '', '-E', '-U'))
+import hid
+
+from plover import log
+from plover.machine.base import ThreadedStenotypeBase
+
+
+STENO_KEY_CHART = (('K-', 'W-', 'R-', '*2', '-R', '-B', '-G', '-S'),
+                   ('*1', '-F', '-P', '-L', '-T', '-D', 'X2-', 'S2-'),
+                   ('#9', '#A', '#B', 'X1-', 'S1-', 'T-', 'P-', 'H-'),
+                   ('#1', '#2', '#3', '#4', '#5', '#6', '#7', '#8'),
+                   ('', '', '-Z', 'A-', 'O-', 'X3', '-E', '-U'))
 
 def packet_to_stroke(p):
    keys = []
    for i, b in enumerate(p):
        map = STENO_KEY_CHART[i]
-       for i in xrange(8):
+       for i in range(8):
            if (b >> i) & 1:
                key = map[-i + 7]
                if key:
@@ -25,14 +32,16 @@ def packet_to_stroke(p):
    return keys
 
 VENDOR_ID = 3526
+PRODUCT_IDS = range(1, 11)
 
 EMPTY = [0] * 5
 
 class DataHandler(object):
+
     def __init__(self, callback):
         self._callback = callback
         self._pressed = EMPTY
-        
+
     def update(self, p):
         if p == EMPTY and self._pressed != EMPTY:
             stroke = packet_to_stroke(self._pressed)
@@ -41,82 +50,82 @@ class DataHandler(object):
             self._pressed = EMPTY
         else:
             self._pressed = [x[0] | x[1] for x in zip(self._pressed, p)]
-        
 
-if sys.platform.startswith('win32'):
-    from plover.machine.base import StenotypeBase
-    from pywinusb import hid
-    
-    class Stenotype(StenotypeBase):
-        def __init__(self, params):
-            StenotypeBase.__init__(self)
-            self._machine = None
 
-        def start_capture(self):
-            """Begin listening for output from the stenotype machine."""
-            devices = hid.HidDeviceFilter(vendor_id = VENDOR_ID).get_devices()
-            if len(devices) == 0:
-                self._error()
-                return
-            self._machine = devices[0]
-            self._machine.open()
-            handler = DataHandler(self._notify)
-            
-            def callback(p):
-                if len(p) != 6: return
-                handler.update(p[1:])
-            
-            self._machine.set_raw_data_handler(callback)
-            self._ready()
+class Treal(ThreadedStenotypeBase):
 
-        def stop_capture(self):
-            """Stop listening for output from the stenotype machine."""
-            if self._machine:
-                self._machine.close()
-            self._stopped()
+    KEYS_LAYOUT = '''
+        #1  #2  #3 #4 #5 #6 #7 #8 #9 #A #B
+        X1- S1- T- P- H- *1 -F -P -L -T -D
+        X2- S2- K- W- R- *2 -R -B -G -S -Z
+                   A- O- X3 -E -U
+    '''
 
-else:
-    from plover.machine.base import ThreadedStenotypeBase
-    import hid
+    def __init__(self, params):
+        super(Treal, self).__init__()
+        self._machine = None
 
-    class Stenotype(ThreadedStenotypeBase):
-        
-        def __init__(self, params):
-            ThreadedStenotypeBase.__init__(self)
-            self._machine = None
+    def _on_stroke(self, keys):
+        steno_keys = self.keymap.keys_to_actions(keys)
+        if steno_keys:
+            self._notify(steno_keys)
 
-        def start_capture(self):
-            """Begin listening for output from the stenotype machine."""
+    def _connect(self):
+        connected = False
+        for product_id in PRODUCT_IDS:
             try:
-                self._machine = hid.device(VENDOR_ID, 1)
-                self._machine.set_nonblocking(1)
-            except IOError as e:
-                self._error()
-                return
-            return ThreadedStenotypeBase.start_capture(self)
+                if hasattr(hid.device, 'open'):
+                    self._machine = hid.device()
+                    self._machine.open(VENDOR_ID, product_id)
+                else:
+                    self._machine = hid.device(VENDOR_ID, product_id)
+            except IOError:
+                self._machine = None
+            else:
+                self._machine.set_nonblocking(0)
+                self._ready()
+                connected = True
+                break
 
-        def stop_capture(self):
-            """Stop listening for output from the stenotype machine."""
-            ThreadedStenotypeBase.stop_capture(self)
-            if self._machine:
+        return connected
+
+    def start_capture(self):
+        """Begin listening for output from the stenotype machine."""
+        if not self._connect():
+            log.warning('Treal is not connected')
+            self._error()
+            return
+        super(Treal, self).start_capture()
+
+    def _reconnect(self):
+        self._machine = None
+        self._initializing()
+
+        connected = self._connect()
+        # Reconnect loop
+        while not self.finished.isSet() and not connected:
+            sleep(0.5)
+            connected = self._connect()
+        return connected
+
+    def run(self):
+        handler = DataHandler(self._on_stroke)
+        self._ready()
+        while not self.finished.isSet():
+            try:
+                packet = self._machine.read(5, 100)
+            except IOError:
                 self._machine.close()
-            self._stopped()
+                log.warning(u'Treal disconnected, reconnecting…')
+                if self._reconnect():
+                    log.warning('Treal reconnected.')
+            else:
+                if len(packet) is 5:
+                    handler.update(packet)
 
-        def run(self):
-            handler = DataHandler(self._notify)
-            self._ready()
-            while not self.finished.isSet():
-                packet = self._machine.read(5)
-                if len(packet) != 5: continue
-                handler.update(packet)
-
-if __name__ == '__main__':
-    from plover.steno import Stroke
-    import time
-    def callback(s):
-        print Stroke(s).rtfcre
-    machine = Stenotype()
-    machine.add_callback(callback)
-    machine.start_capture()
-    time.sleep(30)
-    machine.stop_capture()
+    def stop_capture(self):
+        """Stop listening for output from the stenotype machine."""
+        super(Treal, self).stop_capture()
+        if self._machine:
+            self._machine.close()
+        self._stopped()
