@@ -109,14 +109,22 @@ KEYBOARD_CONFIG_FRAME_Y_OPTION = 'y'
 DEFAULT_KEYBOARD_CONFIG_FRAME_Y = -1
 
 MULTIPLE_OUTPUT_CONFIG_SECTION = 'Multiple Output Configuration'
-DEFAULT_MULTIPLE_OUTPUT = False
 MULTIPLE_OUTPUT_OPTION = 'multiple_output'
-SECOND_OUTPUT_TRANSLATED = 'second_output_translated'
-DEFAULT_SECOND_OUTPUT_TRANSLATED = False
-SECOND_OUTPUT_DICTIONARY_ORDER_REVERSED = 'second_output_dict_order_reversed'
-DEFAULT_SECOND_OUTPUT_DICTIONARY_ORDER_REVERSED = True
-SECOND_OUTPUT_LOCATION = 'second_output_location'
-DEFAULT_SECOND_OUTPUT_LOCATION = ''
+DEFAULT_MULTIPLE_OUTPUT = False
+FLOWS_COUNT = 'flows_count'
+DEFAULT_FLOWS_COUNT = 1
+OUTPUT_TRANSLATED = 'output_translated'
+DEFAULT_OUTPUT_TRANSLATED = True
+OUTPUT_DICTIONARY_ORDER_REVERSED = 'output_dict_order_reversed'
+DEFAULT_OUTPUT_DICTIONARY_ORDER_REVERSED = False
+OUTPUT_ENABLED = 'output_enabled'
+DEFAULT_OUTPUT_ENABLED = True
+OUTPUT_WINDOW = 'output_window'
+DEFAULT_OUTPUT_WINDOW = 'Focus window'
+OUTPUT_WINDOWS_HANDLE = 'output_windows_handle'
+DEFAULT_OUTPUT_WINDOWS_HANDLE = ''
+WINDOWS_HANDLES_FILE_OPTION = 'windows_handles_file'
+DEFAULT_WINDOWS_HANDLES_FILE = os.path.join(ASSETS_DIR, 'windowshandles.json')
 
 # Dictionary constants.
 JSON_EXTENSION = '.json'
@@ -128,6 +136,8 @@ LOG_EXTENSION = '.log'
 # TODO: Unit test this class
 
 class Config(object):
+
+    DEFAULT_OUTPUT_WINDOW = DEFAULT_OUTPUT_WINDOW
 
     def __init__(self):
         self._config = RawConfigParser()
@@ -440,32 +450,74 @@ class Config(object):
                               MULTIPLE_OUTPUT_OPTION,
                               DEFAULT_MULTIPLE_OUTPUT)
 
-    def set_second_output_translated(self, translated):
-        self._set(MULTIPLE_OUTPUT_CONFIG_SECTION, SECOND_OUTPUT_TRANSLATED,
-                  translated)
+    def set_flows_count(self, count):
+        self._set(MULTIPLE_OUTPUT_CONFIG_SECTION, FLOWS_COUNT, count)
 
-    def get_second_output_translated(self):
+    def get_flows_count(self):
+        return self._get_int(MULTIPLE_OUTPUT_CONFIG_SECTION, 
+                              FLOWS_COUNT,
+                              DEFAULT_FLOWS_COUNT)
+
+    def set_output_enabled(self, enabled, index):
+        self._set(MULTIPLE_OUTPUT_CONFIG_SECTION, OUTPUT_ENABLED + str(index), enabled)
+
+    def get_output_enabled(self, index):
         return self._get_bool(MULTIPLE_OUTPUT_CONFIG_SECTION,
-                              SECOND_OUTPUT_TRANSLATED,
-                              DEFAULT_SECOND_OUTPUT_TRANSLATED)
+                              OUTPUT_ENABLED + str(index),
+                              DEFAULT_OUTPUT_ENABLED)
 
-    def set_second_output_dictionary_order_reversed(self, order_reversed):
-        self._set(MULTIPLE_OUTPUT_CONFIG_SECTION, SECOND_OUTPUT_DICTIONARY_ORDER_REVERSED,
-                  order_reversed)
+    def set_output_translated(self, translated, index):
+        self._set(MULTIPLE_OUTPUT_CONFIG_SECTION, OUTPUT_TRANSLATED + str(index), translated)
 
-    def get_second_output_dictionary_order_reversed(self):
+    def get_output_translated(self, index):
         return self._get_bool(MULTIPLE_OUTPUT_CONFIG_SECTION,
-                              SECOND_OUTPUT_DICTIONARY_ORDER_REVERSED,
-                              DEFAULT_SECOND_OUTPUT_DICTIONARY_ORDER_REVERSED)
+                              OUTPUT_TRANSLATED + str(index),
+                              DEFAULT_OUTPUT_TRANSLATED)
 
-    def set_second_output_location(self, location):
-        self._set(MULTIPLE_OUTPUT_CONFIG_SECTION, SECOND_OUTPUT_LOCATION,
-                  location)
+    def set_output_dictionary_order_reversed(self, order_reversed, index):
+        self._set(MULTIPLE_OUTPUT_CONFIG_SECTION, OUTPUT_DICTIONARY_ORDER_REVERSED + str(index), order_reversed)
 
-    def get_second_output_location(self):
+    def get_output_dictionary_order_reversed(self, index):
+        return self._get_bool(MULTIPLE_OUTPUT_CONFIG_SECTION,
+                              OUTPUT_DICTIONARY_ORDER_REVERSED + str(index),
+                              DEFAULT_OUTPUT_DICTIONARY_ORDER_REVERSED)
+
+    def set_output_window(self, window, index):
+        self._set(MULTIPLE_OUTPUT_CONFIG_SECTION, OUTPUT_WINDOW + str(index), window)
+
+    def get_output_window(self, index):
         return self._get(MULTIPLE_OUTPUT_CONFIG_SECTION,
-                         SECOND_OUTPUT_LOCATION,
-                         DEFAULT_SECOND_OUTPUT_LOCATION)
+                         OUTPUT_WINDOW + str(index),
+                         DEFAULT_OUTPUT_WINDOW)
+
+    def set_output_windows_handle(self, window_handle, index):
+        self._set(MULTIPLE_OUTPUT_CONFIG_SECTION, OUTPUT_WINDOWS_HANDLE + str(index), window_handle)
+
+    def get_output_windows_handle(self, index):
+        return self._get(MULTIPLE_OUTPUT_CONFIG_SECTION,
+                         OUTPUT_WINDOWS_HANDLE + str(index),
+                         DEFAULT_OUTPUT_WINDOWS_HANDLE)
+
+    def set_windows_handles(self, handles):
+        if self._config.has_section(DICTIONARY_CONFIG_SECTION):
+            self._config.remove_section(DICTIONARY_CONFIG_SECTION)
+        self._config.add_section(DICTIONARY_CONFIG_SECTION)
+        for ordinal, filename in enumerate(filenames, start=1):
+            option = DICTIONARY_FILE_OPTION + str(ordinal)
+            self._config.set(DICTIONARY_CONFIG_SECTION, option, filename)
+
+    def get_windows_handles(self):
+        
+        filenames = []
+        if self._config.has_section(DICTIONARY_CONFIG_SECTION):
+            options = filter(lambda x: x.startswith(DICTIONARY_FILE_OPTION),
+                             self._config.options(DICTIONARY_CONFIG_SECTION))
+            options.sort(key=_dict_entry_key)
+            filenames = [self._config.get(DICTIONARY_CONFIG_SECTION, o) 
+                         for o in options]
+        if not filenames or filenames == ['dict.json']:
+            filenames = [DEFAULT_DICTIONARY_FILE]
+        return filenames
 
     def _set(self, section, option, value):
         if not self._config.has_section(section):

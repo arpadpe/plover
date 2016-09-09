@@ -238,7 +238,7 @@ class KeyboardCapture(threading.Thread):
 class KeyboardEmulation(object):
     """Emulate keyboard events."""
 
-    def __init__(self, target_window_class=None):
+    def __init__(self, target_window=None):
         """Prepare to emulate keyboard events."""
         self.display = display.Display()
         self.modifier_mapping = self.display.get_modifier_mapping()
@@ -247,7 +247,7 @@ class KeyboardEmulation(object):
         self.backspace_keycode, mods = self._keysym_to_keycode_and_modifiers(
                                                 backspace_keysym)
         self.time = 0
-        self.target_window_class = target_window_class;
+        self.target_window = target_window;
 
     def send_backspaces(self, number_of_backspaces):
         """Emulate the given number of backspaces.
@@ -387,15 +387,8 @@ class KeyboardEmulation(object):
 
         """
 
-        if self.target_window_class is not None:
-            self.win_list = self.display.screen().root.query_tree().children
-            for win in self.win_list:
-                try:
-                    if self.target_window_class == win.query_tree().children[0].query_tree().children[0].get_wm_class():
-                        target_window = win.query_tree().children[0].query_tree().children[0].query_tree().children[0]
-                except IndexError:
-                    # Thrown if a window doesn't have children
-                    pass
+        if self.target_window:
+            target_window = self.target_window
         else:
             target_window = self.display.get_input_focus().focus
 

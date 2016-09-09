@@ -169,20 +169,25 @@ class MainFrame(wx.Frame):
             self._show_alert(unicode(e))
             self.config.clear()
 
-        multipleoutput = self.config.get_multiple_output()
-
-        self.steno_engine = app.StenoEngine(multipleoutput)
+        self.steno_engine = app.StenoEngine()
 
         rect = wx.Rect(config.get_main_frame_x(), config.get_main_frame_y(), *self.GetSize())
         self.SetRect(AdjustRectToScreen(rect))
 
         self.steno_engine.add_callback(
             lambda s: wx.CallAfter(self._update_status, s))
-        self.steno_engine.set_output(
-            Output(self.consume_command, self.steno_engine))
-        secondoutput = SecondOutput(self.consume_command, self.steno_engine)
-        secondoutput.set_output_location(self.config.get_second_output_location())
-        self.steno_engine.set_second_output(secondoutput)
+        #self.steno_engine.set_output( Output(self.consume_command, self.steno_engine))
+
+        flows_count = self.config.get_flows_count()
+
+        for i in range(0, flows_count):
+            self.steno_engine.increment_flows()
+            if self.config.get_output_window(i) is self.config.DEFAULT_OUTPUT_WINDOW:
+                output = Output(self.consume_command, self.steno_engine)
+            else:
+                output = SecondaryOutput(self.consume_command, self.steno_engine)
+                output.set_output_location(self.config.get_output_location(i))
+            self.steno_engine.set_flow_output(i, output)
 
         while True:
             try:
@@ -207,6 +212,21 @@ class MainFrame(wx.Frame):
             SuggestionsDisplayDialog.stroke_handler)
         if self.config.get_show_suggestions_display():
             SuggestionsDisplayDialog.display(self, self.config, self.steno_engine)
+
+    def _update_flows(self, engine, old, new):
+        if new.get_multiple_output():
+            flows_count = new.get_flows_count()
+
+            engine.clear_flows()
+
+            for i in range(0, flows_count):
+                engine.increment_flows()
+                if self.config.get_output_window(i) is self.config.DEFAULT_OUTPUT_WINDOW:
+                    output = Output(self.consume_command, self.steno_engine)
+                else:
+                    output = plover.gui.main.SecondaryOutput(self.consume_command, engine)
+                    output.set_output_location(self.config.get_output_location(i))
+                engine.set_flow_output(i, output)
 
     def consume_command(self, command):
         # The first commands can be used whether plover is active or not.
@@ -341,14 +361,15 @@ class Output(object):
         if result and not self.engine.is_running:
             self.engine.machine.suppress = self.send_backspaces
 
-class SecondOutput(object):
+class SecondaryOutput(object):
     def __init__(self, engine_command_callback, engine):
         self.engine_command_callback = engine_command_callback
         self.output_control = OutputHandler()
         self.engine = engine
 
-    def set_output_location(self, windowname):
-        self.output_control.set_output_location(windowname)
+    def set_output_location(self, identifier):
+        print identifier
+        self.output_control.set_output_location(identifier)
 
     def send_backspaces(self, b):
         wx.CallAfter(self.output_control.send_backspaces, b)
@@ -359,7 +380,6 @@ class SecondOutput(object):
     def send_key_combination(self, c):
         wx.CallAfter(self.output_control.send_key_combination, c)
 
-    # TODO: test all the commands now
     def send_engine_command(self, c):
         result = self.engine_command_callback(c)
         if result and not self.engine.is_running:

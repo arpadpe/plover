@@ -56,11 +56,14 @@ def init_engine(engine, config):
         raise InvalidConfigurationError(unicode(e))
     engine.get_dictionary().set_dicts(dicts)
 
-    if engine.multipleoutput and config.get_second_output_translated():
-        if config.get_second_output_dictionary_order_reversed():
-            engine.get_second_translator_dictionary().set_dicts(dicts[::-1])
-        else:
-            engine.get_second_translator_dictionary().set_dicts(dicts)
+    flows_count = config.get_flows_count()
+
+    for i in range(0, flows_count):
+        if config.get_output_translated(i):
+            if config.get_output_dictionary_order_reversed(i):
+                engine.get_flow_translator_dictionary(i).set_dicts(dicts[::-1])
+            else:
+                engine.get_flow_translator_dictionary(i).set_dicts(dicts)
 
     log_file_name = config.get_log_file_name()
     if log_file_name:
@@ -122,6 +125,20 @@ def update_engine(engine, old, new):
     if old.get_space_placement() != space_placement:
         engine.set_space_placement(space_placement)
 
+    flows_count = new.get_flows_count()
+
+    for i in range(0, flows_count):
+        print i
+        if new.get_output_translated(i):
+            try:
+                dicts = dict_manager.load(dictionary_file_names)
+                if new.get_output_dictionary_order_reversed(i):
+                    engine.get_flow_translator_dictionary(i).set_dicts(dicts[::-1])
+                else:
+                    engine.get_flow_translator_dictionary(i).set_dicts(dicts)
+            except DictionaryLoaderException as e:
+                raise InvalidConfigurationError(unicode(e))
+
 def same_thread_hook(fn, *args):
     fn(*args)
 
@@ -156,13 +173,14 @@ class StenoEngine(object):
 
     """
 
-    def __init__(self, multipleoutput, thread_hook=same_thread_hook):
+    def __init__(self, thread_hook=same_thread_hook):
         """Creates and configures a single steno pipeline."""
         self.subscribers = []
         self.stroke_listeners = []
         self.is_running = False
         self.machine = None
         self.thread_hook = thread_hook
+        self.flows = []
 
         self.translator = translation.Translator()
         self.formatter = formatting.Formatter()
@@ -173,17 +191,6 @@ class StenoEngine(object):
         # be parameterized.
         self.translator.set_min_undo_length(10)
 
-        self.multipleoutput = multipleoutput
-        if self.multipleoutput:
-            self.formatter2 = formatting.Formatter()
-            self.translator2 = translation.Translator()
-            #self.translator2 = self.translator
-            self.translator2.add_listener(self.logger.log_translation)
-            self.translator2.add_listener(self.formatter2.format)
-            self.translator2.set_min_undo_length(10)
-
-        self.full_output = SimpleNamespace()
-        self.second_output = SimpleNamespace()
         self.command_only_output = SimpleNamespace()
         self.running_state = self.translator.get_state()
         self.set_is_running(False)
@@ -205,46 +212,40 @@ class StenoEngine(object):
         else:
             self.set_is_running(False)
 
+    def increment_flows(self):
+        self.flows.append(Flow(self, len(self.flows)))
+
+    def clear_flows(self):
+        del(self.flows)
+        self.flows = []
+
     def set_dictionary(self, d):
         self.translator.set_dictionary(d)
 
     def get_dictionary(self):
         return self.translator.get_dictionary()
 
-    def get_second_translator_dictionary(self):
-        return self.translator2.get_dictionary()
+    def get_flow_translator_dictionary(self, index):
+        print len(self.flows)
+        return self.flows[index].get_translator().get_dictionary()
 
     def set_is_running(self, value):
         self.is_running = value
         if self.is_running:
-            self.translator.set_state(self.running_state)
-            self.formatter.set_output(self.full_output)
-            if self.multipleoutput:
-                self.translator2.set_state(self.running_state)
-                self.formatter2.set_output(self.second_output)
+            for flow in self.flows:
+                flow.get_translator().set_state(self.running_state)
+                flow.get_formatter().set_output(flow.full_output)
         else:
-            self.translator.clear_state()
-            self.formatter.set_output(self.command_only_output)
-            if self.multipleoutput:
-                self.translator2.clear_state()
-                self.formatter2.set_output(self.command_only_output)
+            for flow in self.flows:
+                flow.get_translator().clear_state()
+                flow.get_formatter().set_output(self.command_only_output)
         if isinstance(self.machine, plover.machine.sidewinder.Stenotype):
             self.machine.suppress_keyboard(self.is_running)
         for callback in self.subscribers:
             callback(None)
 
-    def set_output(self, o):
-        self.full_output.send_backspaces = o.send_backspaces
-        self.full_output.send_string = o.send_string
-        self.full_output.send_key_combination = o.send_key_combination
-        self.full_output.send_engine_command = o.send_engine_command
-        self.command_only_output.send_engine_command = o.send_engine_command
-
-    def set_second_output(self, o):
-        self.second_output.send_backspaces = o.send_backspaces
-        self.second_output.send_string = o.send_string
-        self.second_output.send_key_combination = o.send_key_combination
-        self.second_output.send_engine_command = o.send_engine_command
+    def set_flow_output(self, index, o):
+        self.flows[index].set_full_output(o)
 
     def destroy(self):
         """Halts the stenography capture-translate-format-display pipeline.
@@ -293,9 +294,8 @@ class StenoEngine(object):
 
     def _translate_stroke(self, s):
         stroke = steno.Stroke(s)
-        self.translator.translate(stroke)
-        if self.multipleoutput:
-            self.translator2.translate(stroke)
+        for flow in self.flows:
+            flow.get_translator().translate(stroke)
         for listener in self.stroke_listeners:
             listener(stroke)
 
@@ -309,4 +309,40 @@ class StenoEngine(object):
     def _machine_state_callback(self, s):
         self.thread_hook(self._notify_listeners, s)
 
+    def get_logger(self):
+        return self.logger
 
+class Flow(object):
+
+    def __init__(self, engine, index):
+        self.index = index
+        self.formatter = formatting.Formatter()
+        self.translator = translation.Translator()
+        self.translator.add_listener(engine.get_logger().log_translation)
+        self.translator.add_listener(self.formatter.format)
+        self.translator.set_min_undo_length(10)
+        self.full_output = SimpleNamespace()
+
+    def get_index(self):
+        return index
+
+    def set_dictionary(self, d):
+        self.translator.set_dictionary(d)
+
+    def get_dictionary(self):
+        return self.translator.get_dictionary()
+
+    def get_translator(self):
+        return self.translator
+
+    def get_formatter(self):
+        return self.formatter
+
+    def get_full_output():
+        return self.full_output
+
+    def set_full_output(self, o):
+        self.full_output.send_backspaces = o.send_backspaces
+        self.full_output.send_string = o.send_string
+        self.full_output.send_key_combination = o.send_key_combination
+        self.full_output.send_engine_command = o.send_engine_command

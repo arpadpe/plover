@@ -4,12 +4,40 @@ from Xlib import X, display
 from plover.oslayer.xkeyboardcontrol import KeyboardEmulation
 
 LINUX_DEFAULTS = ["Desktop", "Hud"]
+DEFAULT_OUTPUT_WINDOW = 'Focus window'
+
+def get_window_name(xid):
+	window = display.Display().create_resource_object('window', xid)
+	return window.get_wm_class()
+
+def get_open_windows(self):
+	windows = {DEFAULT_OUTPUT_WINDOW : lambda x : x = self.display.get_input_focus().focus}
+	display = display.Display()
+	win_list = display.screen().root.query_tree().children
+	for win in win_list:
+	    attrs = win.get_attributes()
+	    if attrs.map_state == X.IsViewable:
+	    	try:
+	    		for child in win.query_tree().children:
+	    			for grandchild in child.query_tree().children:
+			    		classname = grandchild.get_wm_class()
+			    		if grandchild is not None and classname is not None and classname not in LINUX_DEFAULTS:
+			    			self.windows[classname] = grandchild.id
+	    	except IndexError:
+	    		# Thrown if a window doesn't have children
+	    		pass
+
+	return windows
+
+def get_window_child_handles(self, windowname):
+	# Not needed under linux
+	return dict()
 
 class OutputHandler():
 
 	def __init__(self):
 		self.keyboard_control = None
-		self.get_open_windows()
+		self.display = display.Display()
 	
 	def send_backspaces(self, number_of_backspaces):
 		if self.keyboard_control is not None:
@@ -23,26 +51,8 @@ class OutputHandler():
 		if self.keyboard_control is not None:
 			self.keyboard_control(s)
 
-	def get_open_windows(self):
-		# return dictionary - windowText,className
-		self.windows = dict()
-		self.display = display.Display()
-		self.win_list = self.display.screen().root.query_tree().children
-		for win in self.win_list:
-		    attrs = win.get_attributes()
-		    if attrs.map_state == X.IsViewable:
-		    	try:
-		    		name = win.query_tree().children[0].query_tree().children[0].get_wm_name()
-		    		classname = win.query_tree().children[0].query_tree().children[0].get_wm_class()
-		    		if name is not None and classname is not None and name not in LINUX_DEFAULTS:
-		    			self.windows[name] = classname
-		    	except IndexError:
-		    		# Thrown if a window doesn't have children
-		    		pass
-
-		return self.windows
-
-	def set_output_location(self, windowname):
-		if windowname not in self.windows.keys():
+	def set_output_location(self, xid):
+		if xid not in self.windows.values():
 			return
-		self.keyboard_control = KeyboardEmulation(self.windows[windowname])
+		window = self.display.create_resource_object('window', int(xid))
+		self.keyboard_control = KeyboardEmulation(window)

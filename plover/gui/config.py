@@ -15,6 +15,7 @@ from plover.gui.serial_config import SerialConfigDialog
 import plover.gui.add_translation
 import plover.gui.lookup
 import plover.gui.dictionary_editor
+import plover.gui.secondary_flow_editor
 from plover.app import update_engine
 from plover.machine.registry import machine_registry
 from plover.exception import InvalidConfigurationError
@@ -22,7 +23,7 @@ from plover.dictionary.loading_manager import manager as dict_manager
 from plover.gui.paper_tape import StrokeDisplayDialog
 from plover.gui.suggestions import SuggestionsDisplayDialog
 from plover.gui.keyboard_config import KeyboardConfigDialog
-from plover.oslayer.outputcontrol import OutputHandler
+import plover.gui.main
 
 EDIT_BUTTON_NAME = "Dictionary Editor"
 ADD_TRANSLATION_BUTTON_NAME = "Add Translation"
@@ -52,6 +53,7 @@ COMPONENT_SPACE = 3
 UP_IMAGE_FILE = os.path.join(conf.ASSETS_DIR, 'up.png')
 DOWN_IMAGE_FILE = os.path.join(conf.ASSETS_DIR, 'down.png')
 REMOVE_IMAGE_FILE = os.path.join(conf.ASSETS_DIR, 'remove.png')
+EDIT_IMAGE_FILE = os.path.join(conf.ASSETS_DIR, 'edit.png')
 TITLE = "Plover Configuration"
 
 class ConfigurationDialog(wx.Dialog):
@@ -82,6 +84,7 @@ class ConfigurationDialog(wx.Dialog):
                            style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
         self.engine = engine
         self.config = config
+        self.parent = parent
 
         # Close all other instances.
         if self.other_instances:
@@ -102,7 +105,7 @@ class ConfigurationDialog(wx.Dialog):
         self.logging_config = LoggingConfig(self.config, notebook)
         self.display_config = DisplayConfig(self.config, notebook, self.engine)
         self.output_config = OutputConfig(self.config, notebook)
-        self.multiple_output_config = MultipleOutputConfig(self.config, notebook, self.engine)
+        self.multiple_output_config = MultipleOutputConfig(self.engine, self.config, notebook)
 
         # Adding each tab
         notebook.AddPage(self.machine_config, MACHINE_CONFIG_TAB_NAME)
@@ -168,6 +171,8 @@ class ConfigurationDialog(wx.Dialog):
         self.display_config.save()
         self.output_config.save()
         self.multiple_output_config.save()
+
+        self.parent._update_flows(self.engine, old_config, self.config)
 
         try:
             update_engine(self.engine, old_config, self.config)
@@ -540,18 +545,15 @@ class OutputConfig(wx.Panel):
         """Write all parameters to the config."""
         self.config.set_space_placement(self.choice.GetStringSelection())
 
-class MultipleOutputConfig(wx.Panel):
+class MultipleOutputConfig(ScrolledPanel):
 
     MULTIPLE_OUTPUT_TEXT = "Enable multiple output"
-    TRANSLATE_SECOND_OUTPUT_TEXT = "Translate second output"
-    REVERSE_SECOND_OUTPUT_DICTIONARY_ORDER_TEXT = "Reverse second output dictionary order"
-    SECOND_OUTPUT_LOCATION = "Second output location"
-    WINDOWS_DEFAULTS = ["Start", "Clock", "CPU Meter", "Program Manager"]
-    PLOVER_DEFAULTS = ["Plover: running", "Plover: stopped", "Plover: error"]
+    EDIT_BUTTON_TEXT = "Edit"
+    REMOVE_BUTTON_TEXT = "Remove"
+    ADD_BUTTON_TEXT = "Add"
 
-    """Configure multiple output"""
-    def __init__(self, config, parent, engine):
-        """Create a configuration component based on the given Config.
+    def __init__(self, engine, config, parent):
+        """Create a configuration component based on the given ConfigParser.
 
         Arguments:
 
@@ -560,43 +562,124 @@ class MultipleOutputConfig(wx.Panel):
         parent -- This component's parent component.
 
         """
-        wx.Panel.__init__(self, parent, size=CONFIG_PANEL_SIZE)
-        self.config = config
+        ScrolledPanel.__init__(self, parent, size=CONFIG_PANEL_SIZE)
         self.engine = engine
-        sizer = wx.BoxSizer(wx.VERTICAL)
+        self.config = config
+        self.flows = []
         
-        self.multiple_output = wx.CheckBox(self, label=self.MULTIPLE_OUTPUT_TEXT)
-        self.multiple_output.SetValue(config.get_multiple_output())
-        sizer.Add(self.multiple_output, border=UI_BORDER, 
-                  flag=wx.LEFT | wx.RIGHT | wx.BOTTOM)
+        self.remove_bitmap = wx.Bitmap(REMOVE_IMAGE_FILE, wx.BITMAP_TYPE_PNG)
+        self.edit_bitmap = wx.Bitmap(EDIT_IMAGE_FILE, wx.BITMAP_TYPE_PNG)
 
-        self.translate_second_output = wx.CheckBox(self, label=self.TRANSLATE_SECOND_OUTPUT_TEXT)
-        self.translate_second_output.SetValue(config.get_second_output_translated())
-        sizer.Add(self.translate_second_output, border=UI_BORDER, 
-                  flag=wx.LEFT | wx.RIGHT | wx.BOTTOM)
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        button = wx.Button(self, wx.ID_ANY, self.ADD_BUTTON_TEXT)
+        main_sizer.Add(button, border=UI_BORDER, flag=wx.ALL)
 
-        self.reverse_second_output_dictionary_order = wx.CheckBox(self, label=self.REVERSE_SECOND_OUTPUT_DICTIONARY_ORDER_TEXT)
-        self.reverse_second_output_dictionary_order.SetValue(config.get_second_output_dictionary_order_reversed())
-        sizer.Add(self.reverse_second_output_dictionary_order, border=UI_BORDER, 
-                  flag=wx.LEFT | wx.RIGHT | wx.BOTTOM)
+        self.flows_count = self.config.get_flows_count()
 
-        self.outputcontrol = OutputHandler()
+        next_index = lambda : len(self.flows)
+        button.Bind(wx.EVT_BUTTON, lambda e: wx.CallAfter(self.show_edit, next_index() ))
 
-        windows = self.outputcontrol.get_open_windows();
+        self.flow_sizer = wx.BoxSizer(wx.VERTICAL)
+        for i in range(0, self.flows_count):
+            flow = self.config.get_output_window(i)
+            self.update_row(flow, i)
 
-        box = wx.BoxSizer(wx.HORIZONTAL)
-        box.Add(wx.StaticText(self, label=self.SECOND_OUTPUT_LOCATION),
-                border=COMPONENT_SPACE,
-                flag=wx.ALIGN_RIGHT | wx.ALIGN_CENTER_VERTICAL | wx.RIGHT)
-        self.choice = wx.Choice(self, choices=windows.keys())
-        box.Add(self.choice, proportion=1, flag=wx.EXPAND)
-        sizer.Add(box, border=UI_BORDER, flag=wx.ALL | wx.EXPAND)
-
-        self.SetSizer(sizer)
+        main_sizer.Add(self.flow_sizer)
+                
+        self.SetSizer(main_sizer)
+        self.SetupScrolling()
 
     def save(self):
         """Write all parameters to the config."""
-        self.config.set_multiple_output(self.multiple_output.GetValue())
-        self.config.set_second_output_translated(self.translate_second_output.GetValue())
-        self.config.set_second_output_dictionary_order_reversed(self.reverse_second_output_dictionary_order.GetValue())
-        self.config.set_second_output_location(self.choice.GetStringSelection())
+        self.config.set_flows_count(len(self.flows))
+        
+    def show_edit(self, index):
+        print index
+        plover.gui.secondary_flow_editor.Show(self.config, self, index)
+        
+    def update_row(self, flow, index):
+        if index < len(self.flows):
+            sizer = self.flows[index]
+            sizer.DeleteWindows()
+        else:            
+            sizer = wx.BoxSizer(wx.HORIZONTAL)
+            self.flow_sizer.Add(sizer)
+            self.flows.append(sizer)
+
+        output_enabled = wx.CheckBox(self)
+        output_enabled.SetValue(self.config.get_output_enabled(index))
+        sizer.Add(output_enabled, border=UI_BORDER, flag=wx.ALL)
+
+        output_enabled.Bind(wx.EVT_CHECKBOX, lambda e: wx.CallAfter(self.update_enabled, flow, index, output_enabled.GetValue()))
+
+        edit_button = wx.BitmapButton(self, bitmap=self.edit_bitmap)
+        edit_button.Bind(wx.EVT_BUTTON, lambda e: wx.CallAfter(self.show_edit, index))
+        sizer.Add(edit_button, border=UI_BORDER)
+
+        remove_button = wx.BitmapButton(self, bitmap=self.remove_bitmap)
+        remove_button.Bind(wx.EVT_BUTTON, lambda e: wx.CallAfter(self.remove_row, index))
+        sizer.Add(remove_button, border=UI_BORDER, flag=wx.LEFT)
+
+        if len(flow) > 220:
+            flow = flow[:220] + "\n" + flow[220:]
+        print flow
+        name_label = wx.StaticText(self, label=flow)
+        sizer.Add(name_label, border=UI_BORDER, flag=wx.ALL)
+
+        translated_label = wx.StaticText(self, label="Translated")
+        sizer.Add(translated_label, border=UI_BORDER, flag=wx.LEFT | wx.TOP | wx.BOTTOM)
+        translated_checkbox = wx.CheckBox(self)
+        translated_checkbox.SetValue(self.config.get_output_translated(index))
+        sizer.Add(translated_checkbox, border=UI_BORDER, flag=wx.ALL | wx.ALIGN_RIGHT)
+
+        translated_checkbox.Bind(wx.EVT_CHECKBOX, lambda e: wx.CallAfter(self.update_translation, flow, index, translated_checkbox.GetValue()))
+
+        if output_enabled.GetValue():
+            edit_button.Enable()
+            remove_button.Enable()
+            name_label.Enable()
+            translated_label.Enable()
+            translated_checkbox.Enable()
+        else:
+            edit_button.Disable()
+            remove_button.Disable()
+            name_label.Disable()
+            translated_label.Disable()
+            translated_checkbox.Disable()
+
+        if self.GetSizer():
+            self.GetSizer().Layout()
+
+    def update_translation(self, flow, index, translated):
+        self.config.set_output_translated(translated, index)
+        self.update_row(flow, index)
+
+    def update_enabled(self, flow, index, enabled):
+        self.config.set_output_enabled(enabled, index)
+        self.update_row(flow, index)
+
+    def remove_row(self, index):
+        for i in range(index, len(self.flows) - 1):
+            translated = self.config.get_output_translated(i + 1)
+            self.config.set_output_translated(translated, i)
+
+            order_reversed = self.config.get_output_dictionary_order_reversed(i + 1)
+            self.config.set_output_dictionary_order_reversed(order_reversed, i)
+
+            windowname = self.config.get_output_window(i + 1)
+            self.config.set_output_window(windowname, i)
+
+            windowhandle = self.config.get_output_windows_handle(i + 1)
+            self.config.set_output_windows_handle(windowhandle, i)
+
+            self.add_row( windowname, i)
+
+            with open(self.config.target_file, 'wb') as f:
+                self.config.save(f)
+
+        self.flows[-1].DeleteWindows()
+        self.flow_sizer.Detach(self.flows[-1])
+        del self.flows[-1]
+        self.GetSizer().Layout()
+        
