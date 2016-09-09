@@ -5,31 +5,40 @@
 
 """
 
-from plover.steno_dictionary import StenoDictionary
-from plover.steno import normalize_steno
-from plover.exception import DictionaryLoaderException
+import io
 
 try:
     import simplejson as json
 except ImportError:
     import json
-    
 
-def load_dictionary(data):
-    """Load a json dictionary from a string."""
+# Python 2/3 compatibility.
+from six import iteritems
 
-    def h(pairs):
-        return StenoDictionary((normalize_steno(x[0]), x[1]) for x in pairs)
+from plover.steno_dictionary import StenoDictionary
+from plover.steno import normalize_steno
 
-    try:
+def create_dictionary():
+    return StenoDictionary()
+
+def load_dictionary(filename):
+
+    for encoding in ('utf-8', 'latin-1'):
         try:
-            return json.loads(data, object_pairs_hook=h)
+            with io.open(filename, 'r', encoding=encoding) as fp:
+                d = json.load(fp)
+                break
         except UnicodeDecodeError:
-            return json.loads(data, 'latin-1', object_pairs_hook=h)
-    except ValueError:
-        raise DictionaryLoaderException('Dictionary is not valid json.')
-        
-# TODO: test this
+            continue
+    else:
+        raise ValueError('\'%s\' encoding could not be determined' % (filename,))
+
+    return StenoDictionary((normalize_steno(x[0]), x[1])
+                           for x in iteritems(dict(d)))
+
+
 def save_dictionary(d, fp):
-    d = dict(('/'.join(k), v) for k, v in d.iteritems())
-    json.dump(d, fp, sort_keys=True, indent=0, separators=(',', ': '))
+    contents = json.dumps(dict(('/'.join(k), v) for k, v in iteritems(d)),
+                          ensure_ascii=False, sort_keys=True,
+                          indent=0, separators=(',', ': '))
+    fp.write(contents.encode('utf-8'))

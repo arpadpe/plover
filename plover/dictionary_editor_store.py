@@ -1,4 +1,6 @@
 from plover.steno import normalize_steno
+from plover.gui.util import shorten_unicode
+from plover.translation import escape_translation, unescape_translation
 
 STROKE = "STROKE"
 TRANSLATION = "TRANSLATION"
@@ -17,7 +19,7 @@ COL_DICTIONARY = COLUMNS.index(DICTIONARY)
 COL_SPACER = COLUMNS.index(SPACER)
 
 
-class DictionaryItem():
+class DictionaryItem(object):
 
     def __init__(self, stroke, translation, dictionary, id):
 
@@ -30,7 +32,7 @@ class DictionaryItem():
         self.id = id
 
 
-class DictionaryEditorStore():
+class DictionaryEditorStore(object):
 
     def __init__(self, engine, config):
 
@@ -53,21 +55,21 @@ class DictionaryEditorStore():
 
         self.pending_changes = False
 
-        dict_index = len(self.engine.get_dictionary().dicts) - 1
-        while dict_index >= 0:
-            dict = self.engine.get_dictionary().dicts[dict_index]
-            for dk in dict.keys():
+        for dictionary in reversed(self.engine.get_dictionary().dicts):
+            for dk, translation in dictionary.iteritems():
                 joined = '/'.join(dk)
-                translation = self.engine.get_dictionary().lookup(dk)
                 item = DictionaryItem(joined,
-                                      translation,
-                                      dict.get_path(),
+                                      escape_translation(translation),
+                                      dictionary,
                                       item_id)
                 self.all_keys.append(item)
                 item_id += 1
-            dict_index -= 1
         self.filtered_keys = self.all_keys[:]
         self.sorted_keys = self.filtered_keys[:]
+
+    def is_row_read_only(self, row):
+        item = self.sorted_keys[row]
+        return item.dictionary.save is None
 
     def GetNumberOfRows(self):
         return len(self.sorted_keys)
@@ -79,31 +81,9 @@ class DictionaryEditorStore():
         if col is COL_STROKE:
             result = item.stroke
         elif col is COL_TRANSLATION:
-            s = item.translation
-            # Detect and shorten unicode to prevent crashes
-            if isinstance(s, unicode):
-                def shorten_unicode(s):
-                    # Turn into 4 byte chars
-                    encoded = s.encode('utf-32-be')
-                    word = ""
-                    for i in xrange(len(encoded)/4):
-                        start = i * 4
-                        end = start + 4
-                        character = encoded[start:end].decode('utf-32-be')
-                        # Get 1 unicode char at a time
-                        character = character.encode('utf-8')
-                        # Within range?
-                        if (len(character) <= 3):
-                            word += character
-                        else:
-                            # Replace with white box
-                            word += unichr(9634)
-                    return word
-                s = shorten_unicode(s)
-            result = s
-
+            result = shorten_unicode(item.translation)
         elif col is COL_DICTIONARY:
-            result = item.dictionary
+            result = item.dictionary.get_path()
         return result
 
     def SetValue(self, row, col, value):
@@ -128,6 +108,7 @@ class DictionaryEditorStore():
         return self.sorting_mode
 
     def ApplyFilter(self, stroke_filter, translation_filter):
+        stroke_filter = '/'.join(normalize_steno(stroke_filter))
         self.filtered_keys = []
         self.sorted_keys = []
         for di in self.added_items:
@@ -161,31 +142,26 @@ class DictionaryEditorStore():
     def SaveChanges(self):
         self.pending_changes = False
 
+        # Set of dictionaries (paths) that needs saving.
+        needs_saving = set()
+
         # Creates
-        for added_item in self.added_items:
-            dict = (self.engine
-                        .get_dictionary()
-                        .get_by_path(added_item.dictionary))
-            dict.__setitem__(self._splitStrokes(added_item.stroke),
-                             added_item.translation)
+        for item in self.added_items:
+            item.dictionary[normalize_steno(item.stroke)] = unescape_translation(item.translation)
+            needs_saving.add(item.dictionary.get_path())
 
         # Updates
-        for modified_item_id in self.modified_items:
-            modified_item = self.all_keys[modified_item_id]
-            dict = (self.engine
-                        .get_dictionary()
-                        .get_by_path(modified_item.dictionary))
-            dict.__setitem__(self._splitStrokes(modified_item.stroke),
-                             modified_item.translation)
+        for item_id in self.modified_items:
+            item = self.all_keys[item_id]
+            item.dictionary[normalize_steno(item.stroke)] = unescape_translation(item.translation)
+            needs_saving.add(item.dictionary.get_path())
 
         # Deletes
-        for deleted_item in self.deleted_items:
-            dict = (self.engine
-                        .get_dictionary()
-                        .get_by_path(deleted_item.dictionary))
-            dict.__delitem__(self._splitStrokes(deleted_item.stroke))
+        for item in self.deleted_items:
+            del item.dictionary[normalize_steno(item.stroke)]
+            needs_saving.add(item.dictionary.get_path())
 
-        self.engine.get_dictionary().save_all()
+        self.engine.get_dictionary().save(needs_saving)
 
     def Sort(self, column):
         if column is not COL_STROKE and column is not COL_TRANSLATION:
@@ -251,7 +227,3 @@ class DictionaryEditorStore():
                                           reverse=reverse_sort)
         else:
             self.sorted_keys = self.filtered_keys[:]
-
-    def _splitStrokes(self, strokes_string):
-        result = normalize_steno(strokes_string.upper())
-        return result

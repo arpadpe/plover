@@ -16,33 +16,19 @@ interface.
 """
 
 
+import os
 # Import plover modules.
 import plover.config as conf
 import plover.formatting as formatting
-import plover.oslayer.keyboardcontrol as keyboardcontrol
-import plover.steno as steno
-import plover.machine.base
-import plover.machine.sidewinder
-import plover.steno_dictionary as steno_dictionary
 import plover.steno as steno
 import plover.translation as translation
-from plover.dictionary.base import load_dictionary
-from plover.exception import InvalidConfigurationError,DictionaryLoaderException
-import plover.dictionary.json_dict as json_dict
-import plover.dictionary.rtfcre_dict as rtfcre_dict
+from plover.exception import InvalidConfigurationError
 from plover.machine.registry import machine_registry, NoSuchMachineException
-from plover.logger import Logger
+from plover.suggestions import Suggestions
+from plover import log
 from plover.dictionary.loading_manager import manager as dict_manager
-import inspect
-
-# Because 2.7 doesn't have this yet.
-class SimpleNamespace(object):
-    def __init__(self, **kwargs):
-        self.__dict__.update(kwargs)
-    def __repr__(self):
-        keys = sorted(self.__dict__)
-        items = ("{}={!r}".format(k, self.__dict__[k]) for k in keys)
-        return "{}({})".format(type(self).__name__, ", ".join(items))
+from plover import system
+from plover.misc import SimpleNamespace
 
 
 def init_engine(engine, config):
@@ -74,56 +60,59 @@ def init_engine(engine, config):
     engine.set_space_placement(config.get_space_placement())
     
     engine.set_is_running(config.get_auto_start())
+    update_engine(engine, config)
 
 def reset_machine(engine, config):
     """Set the machine on the engine based on config."""
-    machine_type = config.get_machine_type()
-    machine_options = config.get_machine_specific_options(machine_type)
-    try:
-        instance = machine_registry.get(machine_type)(machine_options)
-    except NoSuchMachineException as e:
-        raise InvalidConfigurationError(unicode(e))
-    engine.set_machine(instance)
+    update_engine(engine, config, reset_machine=True)
 
-def update_engine(engine, old, new):
+def update_engine(engine, config, reset_machine=False):
     """Modify a StenoEngine using a before and after config object.
     
     Using the before and after allows this function to not make unnecessary 
     changes.
     """
-    machine_type = new.get_machine_type()
-    machine_options = new.get_machine_specific_options(machine_type)
-    if (old.get_machine_type() != machine_type or 
-        old.get_machine_specific_options(machine_type) != machine_options):
-        try:
-            machine_class = machine_registry.get(machine_type)
-        except NoSuchMachineException as e:
-            raise InvalidConfigurationError(unicode(e))
-        engine.set_machine(machine_class(machine_options))
+    machine_type = config.get_machine_type()
+    try:
+        machine_class = machine_registry.get(machine_type)
+    except NoSuchMachineException as e:
+        raise InvalidConfigurationError(str(e))
+    machine_options = config.get_machine_specific_options(machine_type)
+    machine_mappings = config.get_system_keymap(machine_type)
+    engine.set_machine(machine_class, machine_options, machine_mappings,
+                       reset_machine=reset_machine)
 
-    dictionary_file_names = new.get_dictionary_file_names()
-    if old.get_dictionary_file_names() != dictionary_file_names:
-        try:
-            dicts = dict_manager.load(dictionary_file_names)
-        except DictionaryLoaderException as e:
-            raise InvalidConfigurationError(unicode(e))
-        engine.get_dictionary().set_dicts(dicts)
+    dictionary_file_names = config.get_dictionary_file_names()
+    engine.set_dictionaries(dictionary_file_names)
 
-    log_file_name = new.get_log_file_name()
-    if old.get_log_file_name() != log_file_name:
-        engine.set_log_file_name(log_file_name)
+    log_file_name = config.get_log_file_name()
+    if log_file_name:
+        # Older versions would use "plover.log" for logging strokes.
+        if os.path.realpath(log_file_name) == os.path.realpath(log.LOG_FILENAME):
+            log.warning('stroke logging must use a different file than %s, '
+                        'renaming to %s', log.LOG_FILENAME, conf.DEFAULT_LOG_FILE)
+            log_file_name = conf.DEFAULT_LOG_FILE
+            config.set_log_file_name(log_file_name)
+            with open(config.target_file, 'wb') as f:
+                config.save(f)
+    engine.set_log_file_name(log_file_name)
 
-    enable_stroke_logging = new.get_enable_stroke_logging()
-    if old.get_enable_stroke_logging() != enable_stroke_logging:
-        engine.enable_stroke_logging(enable_stroke_logging)
+    enable_stroke_logging = config.get_enable_stroke_logging()
+    engine.enable_stroke_logging(enable_stroke_logging)
 
-    enable_translation_logging = new.get_enable_translation_logging()
-    if old.get_enable_translation_logging() != enable_translation_logging:
-        engine.enable_translation_logging(enable_translation_logging)
+    enable_translation_logging = config.get_enable_translation_logging()
+    engine.enable_translation_logging(enable_translation_logging)
 
-    space_placement = new.get_space_placement()
-    if old.get_space_placement() != space_placement:
-        engine.set_space_placement(space_placement)
+    space_placement = config.get_space_placement()
+    engine.set_space_placement(space_placement)
+
+    undo_levels = config.get_undo_levels()
+    engine.set_undo_levels(undo_levels)
+
+    start_capitalized = config.get_start_capitalized()
+    start_attached = config.get_start_attached()
+    engine.set_starting_stroke_state(attach=start_attached,
+                                     capitalize=start_capitalized)
 
     flows_count = new.get_flows_count()
 
@@ -179,38 +168,59 @@ class StenoEngine(object):
         self.stroke_listeners = []
         self.is_running = False
         self.machine = None
+        self.machine_class = None
+        self.machine_options = None
+        self.machine_mappings = None
+        self.suggestions = None
         self.thread_hook = thread_hook
         self.flows = []
 
         self.translator = translation.Translator()
         self.formatter = formatting.Formatter()
-        self.logger = Logger()
-        self.translator.add_listener(self.logger.log_translation)
+        self.translator.add_listener(log.translation)
         self.translator.add_listener(self.formatter.format)
-        # This seems like a reasonable number. If this becomes a problem it can
-        # be parameterized.
-        self.translator.set_min_undo_length(10)
 
         self.command_only_output = SimpleNamespace()
         self.running_state = self.translator.get_state()
         self.set_is_running(False)
 
-    def set_machine(self, machine):
-        if self.machine:
+    def set_machine(self, machine_class,
+                    machine_options=None,
+                    machine_mappings=None,
+                    reset_machine=False):
+        if (not reset_machine and
+            self.machine_class == machine_class and
+            self.machine_options == machine_options and
+            self.machine_mappings == machine_mappings):
+            return
+        if self.machine is not None:
+            log.debug('stopping machine: %s', self.machine_class.__name__)
             self.machine.remove_state_callback(self._machine_state_callback)
             self.machine.remove_stroke_callback(
                 self._translator_machine_callback)
-            self.machine.remove_stroke_callback(self.logger.log_stroke)
+            self.machine.remove_stroke_callback(log.stroke)
             self.machine.stop_capture()
-        self.machine = machine
-        if self.machine:
-            self.machine.add_state_callback(self._machine_state_callback)
-            self.machine.add_stroke_callback(self.logger.log_stroke)
-            self.machine.add_stroke_callback(self._translator_machine_callback)
+            self.machine_class = None
+            self.machine_options = None
+            self.machine_mappings = None
+            self.machine = None
+        if machine_class is not None:
+            log.debug('starting machine: %s', machine_class.__name__)
+            machine = machine_class(machine_options)
+            if machine_mappings is not None:
+               machine.set_mappings(machine_mappings)
+            machine.add_state_callback(self._machine_state_callback)
+            machine.add_stroke_callback(log.stroke)
+            machine.add_stroke_callback(self._translator_machine_callback)
+            self.machine = machine
+            self.machine_class = machine_class
+            self.machine_options = machine_options
+            self.machine_mappings = machine_mappings
             self.machine.start_capture()
-            self.set_is_running(self.is_running)
+            is_running = self.is_running
         else:
-            self.set_is_running(False)
+            is_running = False
+        self.set_is_running(is_running)
 
     def increment_flows(self):
         self.flows.append(Flow(self, len(self.flows)))
@@ -219,8 +229,11 @@ class StenoEngine(object):
         del(self.flows)
         self.flows = []
 
-    def set_dictionary(self, d):
-        self.translator.set_dictionary(d)
+    def set_dictionaries(self, file_names):
+        dictionary = self.translator.get_dictionary()
+        dicts = dict_manager.load(file_names)
+        dictionary.set_dicts(dicts)
+        self.suggestions = Suggestions(dictionary)
 
     def get_dictionary(self):
         return self.translator.get_dictionary()
@@ -229,7 +242,12 @@ class StenoEngine(object):
         print len(self.flows)
         return self.flows[index].get_translator().get_dictionary()
 
+    def get_suggestions(self, translation):
+        return self.suggestions.find(translation)
+
     def set_is_running(self, value):
+        if value != self.is_running:
+            log.debug('%s output', 'enabling' if value else 'disabling')
         self.is_running = value
         if self.is_running:
             for flow in self.flows:
@@ -241,6 +259,10 @@ class StenoEngine(object):
                 flow.get_formatter().set_output(self.command_only_output)
         if isinstance(self.machine, plover.machine.sidewinder.Stenotype):
             self.machine.suppress_keyboard(self.is_running)
+#            self.translator.clear_state()
+#            self.formatter.set_output(self.command_only_output)
+#        if self.machine is not None:
+#            self.machine.set_suppression(self.is_running)
         for callback in self.subscribers:
             callback(None)
 
@@ -272,19 +294,27 @@ class StenoEngine(object):
         
     def set_log_file_name(self, filename):
         """Set the file name for log output."""
-        self.logger.set_filename(filename)
+        log.set_stroke_filename(filename)
 
     def enable_stroke_logging(self, b):
         """Turn stroke logging on or off."""
-        self.logger.enable_stroke_logging(b)
+        log.enable_stroke_logging(b)
 
     def set_space_placement(self, s):
         """Set whether spaces will be inserted before the output or after the output."""
         self.formatter.set_space_placement(s)
-        
+
+    def set_starting_stroke_state(self, capitalize=False, attach=False):
+        self.formatter.start_attached = attach
+        self.formatter.start_capitalized = capitalize
+
+    def set_undo_levels(self, levels):
+        """Set the maximum number of changes that can be undone."""
+        self.translator.set_min_undo_length(levels)
+
     def enable_translation_logging(self, b):
         """Turn translation logging on or off."""
-        self.logger.enable_translation_logging(b)
+        log.enable_translation_logging(b)
 
     def add_stroke_listener(self, listener):
         self.stroke_listeners.append(listener)

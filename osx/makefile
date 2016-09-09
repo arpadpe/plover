@@ -1,31 +1,40 @@
 # Set PYTHON to the version to be deployed. This may or may not be the default
 # installation.
-PYTHON ?= python
+PYTHON ?= python2
 
-all: Plover.dmg
+topdir = ..
+builddir = $(topdir)/build
+distdir = $(topdir)/dist
 
-dist/Plover.app:
-	$(PYTHON) setup.py py2app
-	rm ../launch.py
-	ditto --arch i386 dist/Plover.app dist/PloverStripped.app
-	rm -rf dist/Plover.app
-	mv dist/PloverStripped.app dist/Plover.app
+VER := $(shell cd $(topdir) && $(PYTHON) setup.py --version)
+TMP_APP := $(distdir)/plover.app
+APP := $(distdir)/plover-$(VER).app
+DMG := $(distdir)/plover-$(VER).dmg
 
-Plover.dmg: dist/Plover.app
+.PHONY: all app dmg clean
+
+all: dmg
+
+app: $(APP)
+dmg: $(DMG)
+
+$(APP):
+	cd $(topdir) && $(PYTHON) setup.py bdist_app
+
+$(DMG): $(APP)
 	mkdir tmp
 	cp plover_template.dmg.gz tmp/plover_template.dmg.gz
 	gunzip tmp/plover_template.dmg.gz 
 	hdiutil resize -size 100m tmp/plover_template.dmg 
 	mkdir tmp/plover_mountpoint
 	hdiutil attach tmp/plover_template.dmg -noautoopen -quiet -mountpoint tmp/plover_mountpoint
-	rm -rf tmp/plover_mountpoint/Plover.app
-	ditto dist/Plover.app tmp/plover_mountpoint/Plover.app
+	rm -rf tmp/plover_mountpoint/plover.app
+	ditto $(APP) tmp/plover_mountpoint/plover.app
 	hdiutil detach $$(hdiutil info | grep plover_mountpoint | grep Apple_HFS | cut -f1)
 	rmdir tmp/plover_mountpoint
-	hdiutil convert tmp/plover_template.dmg -format UDZO -imagekey zlib-level=9 -o Plover.dmg
+	hdiutil convert tmp/plover_template.dmg -format UDZO -imagekey zlib-level=9 -o $(DMG)
 	rm tmp/plover_template.dmg
 	rmdir tmp
 
-.PHONY: clean
 clean:
-	-rm -rf build/ dist/ Plover.dmg tmp/
+	-rm -rf $(builddir) $(distdir) $(APP) $(DMG) tmp/

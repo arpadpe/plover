@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # Copyright (c) 2010 Joshua Harlan Lifton.
 # See LICENSE.txt for details.
 #
@@ -16,24 +16,38 @@ emulate keyboard input.
 
 """
 
+# Python 2/3 compatibility.
+from __future__ import print_function
+
 import sys
 
 KEYBOARDCONTROL_NOT_FOUND_FOR_OS = \
         "No keyboard control module was found for os %s" % sys.platform
 
 if sys.platform.startswith('linux'):
-    import xkeyboardcontrol as keyboardcontrol
+    from plover.oslayer import xkeyboardcontrol as keyboardcontrol
 elif sys.platform.startswith('win32'):
-    import winkeyboardcontrol as keyboardcontrol
+    from plover.oslayer import winkeyboardcontrol as keyboardcontrol
 elif sys.platform.startswith('darwin'):
-    import osxkeyboardcontrol as keyboardcontrol
+    from plover.oslayer import osxkeyboardcontrol as keyboardcontrol
 else:
     raise Exception(KEYBOARDCONTROL_NOT_FOUND_FOR_OS)
 
 
 class KeyboardCapture(keyboardcontrol.KeyboardCapture):
     """Listen to keyboard events."""
-    pass
+
+    # Supported keys.
+    SUPPORTED_KEYS_LAYOUT = '''
+    Escape  F1 F2 F3 F4  F5 F6 F7 F8  F9 F10 F11 F12
+
+      `  1  2  3  4  5  6  7  8  9  0  -  =  \\ BackSpace  Insert Home Page_Up
+     Tab  q  w  e  r  t  y  u  i  o  p  [  ]               Delete End  Page_Down
+           a  s  d  f  g  h  j  k  l  ;  '      Return
+            z  x  c  v  b  n  m  ,  .  /                          Up
+                     space                                   Left Down Right
+    '''
+    SUPPORTED_KEYS = tuple(SUPPORTED_KEYS_LAYOUT.split())
 
 
 class KeyboardEmulation(keyboardcontrol.KeyboardEmulation):
@@ -42,23 +56,35 @@ class KeyboardEmulation(keyboardcontrol.KeyboardEmulation):
 
 
 if __name__ == '__main__':
+
+    import time
+
     kc = KeyboardCapture()
     ke = KeyboardEmulation()
 
-    def test(event):
-        print event
-        ke.send_backspaces(3)
-        ke.send_string('foo')
+    pressed = set()
+    status = u'pressed: '
 
-    # For the windows version
-    kc._create_own_pump = True
+    def test(key, action):
+        global status
+        print(key, action)
+        if u'pressed' == action:
+            pressed.add(key)
+        elif key in pressed:
+            pressed.remove(key)
+        new_status = u'pressed: ' + u'+'.join(pressed)
+        if status != new_status:
+            ke.send_backspaces(len(status))
+            ke.send_string(new_status)
+            status = new_status
 
-    kc.key_down = test
-    kc.key_up = test
+    kc.key_down = lambda k: test(k, u'pressed')
+    kc.key_up = lambda k: test(k, u'released')
+    kc.suppress_keyboard(KeyboardCapture.SUPPORTED_KEYS)
     kc.start()
-    print 'Press CTRL-c to quit.'
+    print('Press CTRL-c to quit.')
     try:
         while True:
-            pass
+            time.sleep(1)
     except KeyboardInterrupt:
         kc.cancel()
