@@ -473,7 +473,7 @@ def _write_to_port(port, data):
         data = buffer(data, port.write(data))
 
 
-class VirtualStenotype(VirtualStenotypeBase):
+class VirtualStenotypeStentura(VirtualStenotypeBase):
     """Stentura interface.
 
     This class implements the three methods necessary for a standard
@@ -482,7 +482,8 @@ class VirtualStenotype(VirtualStenotypeBase):
     """
 
     def __init__(self, params):
-		VirtualStenotypeBase.__init__(self, params)
+        VirtualStenotypeBase.__init__(self, params)
+        self.params = params
 		
 
     def send(self, key_stroke):
@@ -521,3 +522,6 @@ class VirtualStenotype(VirtualStenotypeBase):
 		packet = _read_packet(port, request_buffer)
 		response = _make_response(response_buffer, _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0], ord(packet[1]))
 		_write_to_port(port, response)
+
+    def __repr__(self):
+        return "VirtualStenotypeStentura(%s)" % self.params

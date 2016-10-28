@@ -1,5 +1,18 @@
 import serial
-from plover.exception import SerialPortException
+#from plover.exception import SerialPortException
+
+		
+class VirtualStenotypeError(Exception):
+	"""Serial exception raised due to an error creating a serial socket."""
+
+	def __init__(self, msg):
+		self.value = msg
+
+	def __str__(self):
+		return "VirtualSenotypeError: %s", self.value
+
+	def __repr__(self):
+		return "VirtualStenotypeError(%s)", self.value
 
 class VirtualStenotypeBase(object):
 	
@@ -27,10 +40,4 @@ class VirtualStenotypeBase(object):
 		pass
 
 	def _error(self, msg):
-		raise VirtualStenotypeError(msg)
-		
-class VirtualStenotypeError(Exception):
-	"""Serial exception raised due to an error creating a serial socket."""
-
-	def __init__(self, msg):
-		self.value = msg
+		raise Exception(msg)

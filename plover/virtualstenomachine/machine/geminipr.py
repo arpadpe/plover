@@ -22,7 +22,7 @@ STENO_KEY_CHART = ("Fn", "#", "#", "#", "#", "#", "#",
 BYTES_PER_STROKE = 6
 
 
-class VirtualStenotype(VirtualStenotypeBase):
+class VirtualStenotypeGeminiPr(VirtualStenotypeBase):
 	"""Standard stenotype interface for a Gemini PR machine.
 
 	This class implements the three methods necessary for a standard
@@ -48,4 +48,7 @@ class VirtualStenotype(VirtualStenotypeBase):
 		self.serial_port.write(packet)
 		
 		del key_sets[:]
+
+	def __repr__(self):
+    	return "VirtualStenotypeGeminiPr(%s)" % self.params
 			

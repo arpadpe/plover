@@ -12,8 +12,10 @@ def create_serial_port(port1, port2):
 		
 	if os.path.isfile(port2):
 		raise SerialError("{} port already used".format(port2))
-		
-	if sys.platform.startswith('linux'):
+
+	if sys.platform.startswith('win32'):
+		return
+	elif sys.platform.startswith('linux'):
 		try:
 			args = ['socat', '-d', '-d', 'pty,raw,echo=0,link='+str(port1), 'pty,raw,echo=0,link='+str(port2)]
 			socat_port = subprocess.Popen(args)		

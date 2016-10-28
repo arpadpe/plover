@@ -12,6 +12,7 @@ from plover.machine.registry import machine_registry
 from plover.gui.serial_config import SerialConfigDialog
 from plover.gui.keyboard_config import KeyboardConfigDialog
 from plover.machine.base import SerialStenotypeBase
+from plover.gui.config import ConfigurationDialog
 
 UI_BORDER = 4
 ERROR_DIALOG_TITLE = "Error"
@@ -124,16 +125,10 @@ class MainFrame(wx.Frame):
 		self.output_info = wx.StaticText(self, label=output_info_text)
 		self.output_sizer.Add(self.output_info)
 		
-		print (input_info_text is self.INPUT_TEXT_DEFAULT)
-		print (output_info_text is self.OUTPUT_TEXT_DEFAULT)
 		if (input_info_text is not self.INPUT_TEXT_DEFAULT) and (output_info_text is not self.OUTPUT_TEXT_DEFAULT):
-			print "enable"
-			#print (input_info_text is not self.INPUT_TEXT_DEFAULT)
-			#print (output_info_text is not self.OUTPUT_TEXT_DEFAULT)
 			self.start_button.Enable()
 			self.stop_button.Enable()
 		else:
-			print "disable"
 			self.start_button.Disable()
 			self.stop_button.Disable()
 			
@@ -142,18 +137,26 @@ class MainFrame(wx.Frame):
 		
 	def _start_machine(self, event=None):
 		"""Called when the start button is clicked."""
-		while True:
-			try:
-				app.init_engine(self.steno_engine, self.config)
-				break
-			except InvalidConfigurationError as e:
-				self._show_alert(unicode(e))
-				dlg = ConfigurationDialog(self.steno_engine, self.config, parent=self)
-				ret = dlg.ShowModal()
-				if ret == wx.ID_CANCEL:
-					self._quit()
-					return
+
+		try:
+			self.machine.start()
+		except Exception as e:
+			self._show_alert(unicode(e))
+			self._quit()
+		
+
+		'''try:
+			app.init_engine(self.steno_engine, self.config)
+			break
+		except Exception as e:
+			self._show_alert(unicode(e))
+			dlg = ConfigurationDialog(self.steno_engine, self.config, parent=self)
+			ret = dlg.ShowModal()
+			if ret == wx.ID_CANCEL:
+				self._quit()
+				return
 		pass
+		'''
 		
 	def _stop_machine(self, event=None):
 		"""Called when the stop button is clicked."""
@@ -471,6 +474,8 @@ class OutputConfigurationDialog(wx.Dialog):
 				self.machine_choice.SetStringSelection(self.machine.get_output_params()['machine_type'])
 			if 'machine_options' in self.machine.get_output_params():
 				self.machine_params = self.machine.get_output_params()['machine_options']
+			else:
+				self.machine_params = None
 			box.Add(self.machine_choice, proportion=1, flag=wx.EXPAND)			
 			self.config_button = wx.Button(self, id=wx.ID_PREFERENCES, label=CONFIG_BUTTON_NAME)
 			box.Add(self.config_button)
@@ -484,8 +489,8 @@ class OutputConfigurationDialog(wx.Dialog):
 			box = wx.BoxSizer(wx.HORIZONTAL)
 			box.Add(wx.StaticText(self, label="HOST: "), border=3, flag=wx.ALIGN_RIGHT | wx.ALIGN_CENTER_VERTICAL | wx.RIGHT)
 			self.host_textctrl = wx.TextCtrl(self)
-			if 'host' in self.machine.get_input_params():
-				self.host_textctrl.SetValue(self.machine.get_input_params()['host'])
+			if 'host' in self.machine.get_output_params():
+				self.host_textctrl.SetValue(self.machine.get_output_params()['host'])
 			else:
 				self.host_textctrl.SetValue(machinenetwork.DEFAULT_HOST)
 			box.Add(self.host_textctrl)
@@ -494,8 +499,8 @@ class OutputConfigurationDialog(wx.Dialog):
 			box = wx.BoxSizer(wx.HORIZONTAL)
 			box.Add(wx.StaticText(self, label="PORT: "), border=3, flag=wx.ALIGN_RIGHT | wx.ALIGN_CENTER_VERTICAL | wx.RIGHT)
 			self.port_textctrl = wx.TextCtrl(self)
-			if 'port' in self.machine.get_input_params():
-				self.port_textctrl.SetValue(self.machine.get_input_params()['port'])
+			if 'port' in self.machine.get_output_params():
+				self.port_textctrl.SetValue(self.machine.get_output_params()['port'])
 			else:
 				self.port_textctrl.SetValue(str(machinenetwork.DEFAULT_PORT))
 			box.Add(self.port_textctrl)
@@ -514,13 +519,13 @@ class OutputConfigurationDialog(wx.Dialog):
 			defaults = {k: v[0] for k, v in info.items()}
 			self.machine_params = defaults
 		try:
-			self.machine.set_output_type(virtualmachine.MACHINE_INPUT_PHYSICAL, { 'machine_type' : self.machine_choice.GetStringSelection(), 'machine_options' : self.machine_params})
+			self.machine.set_output_type(virtualmachine.MACHINE_OUTPUT_SERIAL, { 'machine_type' : self.machine_choice.GetStringSelection(), 'machine_options' : self.machine_params})
 			if self.IsModal():
 				self.EndModal(wx.ID_SAVE)
 			else:
 				self.Close()
-		except TypeError as e:
-			self._show_error_alert("Machine not configured")
+			#except TypeError as e:
+			#	self._show_error_alert("Machine not configured")
 		except InputError as e:
 			self._show_error_alert(e.value)
 			
@@ -561,3 +566,8 @@ class OutputConfigurationDialog(wx.Dialog):
 		self.other_instances.remove(self)
 		self.parent._update()
 		event.Skip()
+		
+	def _show_error_alert(self, message):
+		alert_dialog = wx.MessageDialog(self, message, ERROR_DIALOG_TITLE, wx.OK | wx.ICON_ERROR)
+		alert_dialog.ShowModal()
+		alert_dialog.Destroy()

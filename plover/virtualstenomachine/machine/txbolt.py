@@ -31,10 +31,13 @@ STENO_KEY_CHART = ("S-", "T-", "K-", "P-", "W-", "H-",  # 00
                    "-T", "-S", "-D", "-Z", "#")         # 11
 
 
-class VirtualStenotype(VirtualStenotypeBase):
+class VirtualStenotypeTxBolt(VirtualStenotypeBase):
 	"""TX Bolt interface.
 
-	This class implements the three methods necessary for a standard
+	This class implements the send method
+
+
+	 necessary for a standard
 	stenotype interface: start_capture, stop_capture, and
 	add_callback.
 
@@ -54,3 +57,6 @@ class VirtualStenotype(VirtualStenotypeBase):
 		self.serial_port.write(chr(0))
 		
 		del key_sets[:]
+
+	def __repr__(self):
+		return "VirtualStenotypeTxBolt(%s)" % self.serial_params

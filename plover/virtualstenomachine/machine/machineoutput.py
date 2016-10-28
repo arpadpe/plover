@@ -3,8 +3,15 @@
 import serial
 import plover.virtualstenomachine.machine.machineserial as machineserial
 from plover.virtualstenomachine.machine.machinenetwork import StenoMachineClient
+from plover.virtualstenomachine.machine.geminipr import VirtualStenotypeGeminiPr as geminipr
+from plover.virtualstenomachine.machine.passport import VirtualStenotypePassport as passport
+from plover.virtualstenomachine.machine.stentura import VirtualStenotypeStentura as stentura
+from plover.virtualstenomachine.machine.txbolt import VirtualStenotypeTxBolt as txbolt
 
-class MachineOutputBase:
+
+machines = { "Gemini PR" : geminipr, "Passport" : passport, "Stentura" : stentura, "TX Bolt" : txbolt}
+
+class MachineOutputBase(object):
 		
 	def start(self):
 		pass
@@ -19,9 +26,12 @@ class MachineOutputBase:
 		return "Output:"
 		
 	def _error(self, msg):
-		raise OutputError(msg)
+		raise Exception(msg)
 
-class MachineOutputSerial:
+	def __repr__(self):
+		return "MachineOutputBase()"
+
+class MachineOutputSerial(MachineOutputBase):
 
 	def __init__(self, params):
 		"""Monitor the stenotype over a serial port.
@@ -30,26 +40,33 @@ class MachineOutputSerial:
 		serial.Serial object.
 
 		"""
-		self.serial_port = None
-		self.serial_params = params['serial_params']
-		self.port_in = params['port1']
-		self.port_out = params['port2']
-		self.machine_type = params['machine_type']
 		
 		try:
-			machineserial.create_serial_port(self.port_in, self.port_out)
-		except machineneserial.SerialError as e:
-			self._error(e.value)
+			self.params = params
+			self.serial_port = None
+			self.serial_params = params['serial_params']
+			self.port_in = params['port1']
+			self.port_out = params['port2']
+			self.machine_type = params['machine_type']
+			self.machine_params = params['machine_params']
+			#machineserial.create_serial_port(self.port_in, self.port_out)
+			self.machine = machines[self.machine_type](self.machine_params)
+			print self.machine
+		except Exception, e:
+			#except machineneserial.SerialError as e:
+			#self._error(e.value)
+			print Exception, str(e)
 		
 	def start(self):
-		pass
+		self.machine.start()
 
 	def stop(self):
 		if self.serial_port:
 			self.serial_port.close()
+			machineneserial.close_serial_port()
 		
 	def send(self, msg):
-		pass
+		self.machine.send(msg)
 
 	@staticmethod
 	def get_machine_info():
@@ -70,7 +87,10 @@ class MachineOutputSerial:
 	def get_info(self):
 		return "Output: Serial output\n "
 
-class MachineOutputNetwork:
+	def __repr__(self):
+		return "MachineOutputSerial(%s)" % (self.params)
+
+class MachineOutputNetwork(MachineOutputBase):
 
 	def __init__(self, HOST, PORT):
 		self.HOST = HOST
@@ -80,14 +100,14 @@ class MachineOutputNetwork:
 	def start(self):
 		try:
 			self.client.start()
-		except:
-			self._error("Could connect to {}:{}".format(self.HOST, self.PORT))
+		except Exception, e:
+			self._error("Could not connect to %s:%s\n%s" % (self.HOST, self.PORT, e))
 		
 	def stop(self):
 		self.client.stop()
 		
 	def send(self, msg):
-		self.client.send(msg)
+		self.client.send(msg + '\n')
 	
 	def get_host(self):
 		return self.HOST
@@ -97,9 +117,6 @@ class MachineOutputNetwork:
 		
 	def get_info(self):
 		return "Output: Network output \nHOST: {} \tPORT: {}".format(self.HOST, str(self.PORT))
-		
-class OutputError(Exception):
-	"""Exception raised for errors in the output."""
 
-	def __init__(self, msg):
-		self.value = msg
+	def __repr__(self):
+		return "MachineOutputNetwork(%s, %s)" % (self.HOST, self.PORT)

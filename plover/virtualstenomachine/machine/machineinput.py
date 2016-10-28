@@ -4,6 +4,7 @@ import os.path
 import threading
 from plover.machine.registry import machine_registry, NoSuchMachineException
 from plover.virtualstenomachine.machine.machinenetwork import StenoMachineServer
+from plover import system
 
 class MachineInputBase(object):
 	"""The base class for stenotype machine input"""
@@ -21,7 +22,7 @@ class MachineInputBase(object):
 		
 		self.subscribers.remove(callback)
 
-	def start_input(self):
+	def start_input(self, done):
 		"""Begin listening for input."""
 		pass
 
@@ -31,7 +32,7 @@ class MachineInputBase(object):
 	
 	def _notify(self, input):
 		"""Invoke the callback of each subscriber with the given argument."""
-		print "notify"
+		print "notify", input
 		for callback in self.subscribers:
 			callback(input)
 			
@@ -40,6 +41,9 @@ class MachineInputBase(object):
 	
 	def _error(self, msg):
 		raise InputError(msg)
+
+	def __repr__(self):
+		return "MachineInputBase()"
 
 class MachineInputFile(MachineInputBase):
 	"""The file input class for stenotype machine input"""
@@ -54,17 +58,21 @@ class MachineInputFile(MachineInputBase):
 		except IOError as e:
 			self._error("File could not be opened")			
 		
-	def start_input(self):
+	def start_input(self, done):
 		for line in self.file:
-			for input in line.split():
+			for input in line.strip().split(';'):
 				if input:
 					self._notify(input)
+		done()
 					
 	def stop_input(self):
 		self.file.close()
 	
 	def get_info(self):
 		return "Input: File input \nfile: {}".format(self.filename)
+
+	def __repr__(self):
+		return "MachineInputFile(%s)" % (self.filename)
 					
 class MachineInputNetwork(MachineInputBase):
 	"""The network input from another virtual steno machine class for stenotype machine input"""
@@ -75,10 +83,10 @@ class MachineInputNetwork(MachineInputBase):
 			self.server = StenoMachineServer(HOST, PORT, self._notify)
 			self.HOST = HOST
 			self.PORT = PORT
-		except:
-			self._error("Could not start network")			
+		except Exception, e:
+			self._error("Could not start network\n%s" % e)
 		
-	def start_input(self):
+	def start_input(self, done):
 		self.server.start()
 		
 	def stop_input(self):
@@ -93,6 +101,9 @@ class MachineInputNetwork(MachineInputBase):
 	def get_info(self):
 		return "Input: Network input \nHOST: {} \tPORT: {}".format(self.HOST, str(self.PORT))
 
+	def __repr__(self):
+		return "MachineInputNetwork(%s, %s)" % (self.HOST, self.PORT)
+
 class MachineInputPhysical(MachineInputBase):
 	"""The input class for stenotype machine from physical machines"""
 
@@ -101,19 +112,24 @@ class MachineInputPhysical(MachineInputBase):
 		try:
 			self.machine = machine_registry.get(machine_type)(machine_options)
 			self.machine_type = machine_type
+			self.machine_options = machine_options
+			mappings = system.KEYMAPS.get(machine_type)
+			self.machine.set_mappings(mappings)
 		except NoSuchMachineException as e:
 			raise InvalidConfigurationError(unicode(e))	
 		
-	def start_input(self):
-		print "start_input"
-		self.machine.add_stroke_callback(self._notify)
+	def start_input(self, done):
+		self.machine.add_stroke_callback(lambda keys: self._notify(' '.join(keys)))
 		self.machine.start_capture()
-					
+
 	def stop_input(self):
 		self.machine.stop_capture()
 	
 	def get_info(self):
 		return "Input: Machine input \nMachine type: {}".format(self.machine_type)
+
+	def __repr__(self):
+		return "MachineInputPhysical(%s, %s)" % (self.machine_type, ",".join(self.machine_options))
 		
 
 class InputError(Exception):

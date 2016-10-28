@@ -39,16 +39,17 @@ class VirtualStenotypeMachine ():
 			
 	def set_output_type(self, output_type, params):
 		if output_type == MACHINE_OUTPUT_SERIAL:
-			self.output = MachineOutputSerial('''TODO''')
+			self.output = MachineOutputSerial(params)
 		elif output_type == MACHINE_OUTPUT_NETWORK:
 			self.output = MachineOutputNetwork(params['host'], params['port'])
 		self.output_type = output_type
 		self.output_params = params
 
 	def start(self):
-		self.input.add_callback(forward)
+		print "Start virtualstenomachine"
+		self.input.add_callback(self.forward)
 		self.output.start()
-		self.input.start_input()
+		self.input.start_input(self.output.stop)
 		
 	def stop(self):
 		if self.input:
@@ -85,4 +86,7 @@ class VirtualStenotypeMachine ():
 		
 	def get_serial_output_types(self):
 		return ['Gemini PR', 'Passport', 'Stentura', 'TX Bolt']
+
+	def __str__(self):
+		return "VirtualStenotypeMachine: %s %s" % (self.input, self.output)
 		
