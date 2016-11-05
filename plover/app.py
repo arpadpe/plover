@@ -50,7 +50,7 @@ def init_engine(engine, config):
                 engine.get_flow_translator_dictionary(i).set_dicts(dicts[::-1])
             else:
                 engine.get_flow_translator_dictionary(i).set_dicts(dicts)
-
+    
     log_file_name = config.get_log_file_name()
     if log_file_name:
         engine.set_log_file_name(log_file_name)
@@ -114,19 +114,19 @@ def update_engine(engine, config, reset_machine=False):
     engine.set_starting_stroke_state(attach=start_attached,
                                      capitalize=start_capitalized)
 
-    flows_count = new.get_flows_count()
+    flows_count = config.get_flows_count()
 
     for i in range(0, flows_count):
-        print i
-        if new.get_output_translated(i):
+        if config.get_output_translated(i):
             try:
                 dicts = dict_manager.load(dictionary_file_names)
-                if new.get_output_dictionary_order_reversed(i):
+                if config.get_output_dictionary_order_reversed(i):
                     engine.get_flow_translator_dictionary(i).set_dicts(dicts[::-1])
                 else:
                     engine.get_flow_translator_dictionary(i).set_dicts(dicts)
             except DictionaryLoaderException as e:
                 raise InvalidConfigurationError(unicode(e))
+
 
 def same_thread_hook(fn, *args):
     fn(*args)
@@ -180,6 +180,7 @@ class StenoEngine(object):
         self.translator.add_listener(log.translation)
         self.translator.add_listener(self.formatter.format)
 
+        self.full_output = SimpleNamespace()
         self.command_only_output = SimpleNamespace()
         self.running_state = self.translator.get_state()
         self.set_is_running(False)
@@ -223,7 +224,7 @@ class StenoEngine(object):
         self.set_is_running(is_running)
 
     def increment_flows(self):
-        self.flows.append(Flow(self, len(self.flows)))
+        self.flows.append(Flow(len(self.flows)))
 
     def clear_flows(self):
         del(self.flows)
@@ -246,25 +247,43 @@ class StenoEngine(object):
         return self.suggestions.find(translation)
 
     def set_is_running(self, value):
+
         if value != self.is_running:
             log.debug('%s output', 'enabling' if value else 'disabling')
         self.is_running = value
+        '''
         if self.is_running:
-            for flow in self.flows:
-                flow.get_translator().set_state(self.running_state)
-                flow.get_formatter().set_output(flow.full_output)
+            self.translator.set_state(self.running_state)
+            self.formatter.set_output(self.full_output)
         else:
-            for flow in self.flows:
-                flow.get_translator().clear_state()
-                flow.get_formatter().set_output(self.command_only_output)
-        if isinstance(self.machine, plover.machine.sidewinder.Stenotype):
-            self.machine.suppress_keyboard(self.is_running)
-#            self.translator.clear_state()
-#            self.formatter.set_output(self.command_only_output)
-#        if self.machine is not None:
-#            self.machine.set_suppression(self.is_running)
+            self.translator.clear_state()
+            self.formatter.set_output(self.command_only_output)
+        if self.machine is not None:
+            self.machine.set_suppression(self.is_running)
         for callback in self.subscribers:
             callback(None)
+        '''
+        for flow in self.flows:
+            if self.is_running:
+                flow.get_translator().set_state(self.running_state)
+                flow.get_formatter().set_output(flow.full_output)
+            else:
+                flow.get_translator().clear_state()
+                flow.get_formatter().set_output(self.command_only_output)
+#            self.translator.clear_state()
+#            self.formatter.set_output(self.command_only_output)
+        if self.machine is not None:
+            self.machine.set_suppression(self.is_running)
+
+        for callback in self.subscribers:
+            callback(None)
+
+    def set_output(self, o):
+        self.full_output.send_backspaces = o.send_backspaces
+        self.full_output.send_string = o.send_string
+        self.full_output.send_key_combination = o.send_key_combination
+        self.full_output.send_engine_command = o.send_engine_command
+        self.command_only_output.send_engine_command = o.send_engine_command
 
     def set_flow_output(self, index, o):
         self.flows[index].set_full_output(o)
@@ -344,13 +363,13 @@ class StenoEngine(object):
 
 class Flow(object):
 
-    def __init__(self, engine, index):
+    def __init__(self, index):
         self.index = index
         self.formatter = formatting.Formatter()
         self.translator = translation.Translator()
-        self.translator.add_listener(engine.get_logger().log_translation)
+        self.translator.add_listener(log.translation)
         self.translator.add_listener(self.formatter.format)
-        self.translator.set_min_undo_length(10)
+        #self.translator.set_min_undo_length(10)
         self.full_output = SimpleNamespace()
 
     def get_index(self):
@@ -376,3 +395,6 @@ class Flow(object):
         self.full_output.send_string = o.send_string
         self.full_output.send_key_combination = o.send_key_combination
         self.full_output.send_engine_command = o.send_engine_command
+
+    def __repr__(self):
+        return 'Flow(%d)' % (self.index)

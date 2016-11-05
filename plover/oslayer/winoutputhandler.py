@@ -4,13 +4,12 @@ import re
 import win32gui
 import win32api
 import win32con
-import pywinauto
 import pywintypes
-from pywinauto import Application
 from winkeyboardcontrol import KeyboardEmulation
+import win_window_handler_loader as loader
 
 WINDOWS_DEFAULTS = ["Start", "Clock", "CPU Meter", "Program Manager"]
-PLOVER_DEFAULTS = ["Plover: running", "Plover: stopped", "Plover: error", "plover"]
+PLOVER_DEFAULTS = ["Plover: running", "Plover: stopped", "Plover: error", "Plover", "plover", "Plover Configuration"]
 DEFAULT_OUTPUT_WINDOW = 'Focus window'
 
 windows = {DEFAULT_OUTPUT_WINDOW : None}
@@ -23,7 +22,6 @@ def get_window_class(hwnd):
 
 def get_open_windows():
 	win32gui.EnumWindows(enumHandler, [windows, get_window_text])
-	print windows
 	return windows
 
 def get_window_child_handles(hwnd):
@@ -36,7 +34,20 @@ def get_window_child_handles(hwnd):
 	except pywintypes.error:
 		# Thrown if no child windows present
 		pass
-	print handles
+	return handles
+
+def get_window_child_handles_for_pattern(windowname):
+	pattern = re.compile(re.escape(windowname), re.IGNORECASE)
+	windows = get_open_windows()
+	match = False
+	handles = None
+	for window, handle in windows.items():
+		if pattern.search(window):
+			if match:
+				raise Exception('Multiple matches found, add specific window name')
+			handles = get_window_child_handles(handle)
+	if handles is None:
+		raise Exception('No matches found, add window name or type handle')
 	return handles
 
 def get_all_handles():
@@ -45,6 +56,42 @@ def get_all_handles():
 	for window, handle in windows.items():
 		handles = get_window_child_handles(handle)
 		window_handles[window] = handles
+	return window_handles
+
+def get_handle_for_window(filename, window):
+	window_handles = loader.load_window_handles(filename)
+	if window in window_handles.keys():
+		return window_handles[window]
+	else:
+		window_handles_regex = { re.compile(re.escape(key), re.IGNORECASE):value for key,value in window_handles.items() }
+		for key, value in window_handles_regex.items():
+			if key.search(window):
+				return value
+	return None
+
+
+def window_found(windowname):
+	pattern = re.compile(re.escape(windowname), re.IGNORECASE)
+	windows = get_open_windows()
+	match = False
+	for window, handle in windows.items():
+		if pattern.search(window):
+			return True
+	return False	
+
+def send_test_text(hwnd=None, windowname=None, handlename=None, text='test'):
+	if not hwnd:
+		if not windowname:
+			raise Exception('No window chosen')
+		if not handlename:
+			raise Exception('No handle chosen')
+		if not window_found(windowname):
+			raise Exception('Wndow not found')
+		window_handles = get_window_child_handles_for_pattern(windowname)
+		hwnd = window_handles[handlename]
+
+	for char in text:
+		win32api.PostMessage(hwnd, win32con.WM_CHAR, ord(char), 0)
 
 def enumHandler(hwnd, lParam):
 	dictionary = lParam[0]
@@ -55,33 +102,54 @@ def enumHandler(hwnd, lParam):
 			dictionary[window] = hwnd
 	return True
 
-class OutputHandler():
+class OutputHandler(object):
 
-	def __init__(self):
+	def __init__(self, backspace = True, handle_file = None):
 		self.destinationHwnd = -1
+		self.backspace = backspace
+		self.handle_file = handle_file
+		try:
+			self.window_handles = loader.load_window_handles(handle_file)
+			self.window_handles_regex = { re.compile(re.escape(key), re.IGNORECASE):value for key,value in self.window_handles.items() }
+		except Exception as e:
+			raise
 	
 	def send_backspaces(self, number_of_backspaces):
 		if self.destinationHwnd < 0:
 			return
 		for _ in xrange(number_of_backspaces):
-			win32api.PostMessage(self.destinationHwnd, win32con.WM_CHAR, ord('\b'), 0)
+			win32api.PostMessage(self.destinationHwnd, win32con.WM_CHAR, ord('\b') if self.backspace else ord('*'), 0)
 
 	def send_string(self, s):
-		print self.destinationHwnd
 		if self.destinationHwnd < 0:
 			return
 		for char in s:
-			print win32api.PostMessage(self.destinationHwnd, win32con.WM_CHAR, ord(char), 0)
+			win32api.PostMessage(self.destinationHwnd, win32con.WM_CHAR, ord(char), 0)
 
 	def send_key_combination(self, s):
 		# Not supported
 		pass
 
-	def set_output_location(self, handle_class):
+	def set_output_location(self, window):
 		window_handles = get_all_handles()
-		for window, handles in window_handles.items():
-			if handle_class in handles.keys():
-				self.destinationHwnd = handles[handle_class]
-				continue
-		#print get_window_class(handle)
-		#self.destinationHwnd = int(window)
+
+		if window not in window_handles.keys():
+			#  TODO: raise???
+			return
+
+		for key, value in self.window_handles_regex.items():
+			if key.search(window):
+				window_handle = value
+				break
+
+		try:
+			self.destinationHwnd = window_handles[window][window_handle]
+			return
+		except Exception as e:
+			pattern = re.compile(re.escape(window_handle), re.IGNORECASE)
+			for handle,hwnd in window_handles[window].values().items():
+				if pattern.match(handle):
+					self.destinationHwnd = hwnd
+					return
+
+		# TODO: if no handler found raise???

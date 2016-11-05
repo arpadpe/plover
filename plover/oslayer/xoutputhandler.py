@@ -33,7 +33,7 @@ def get_window_child_handles(self, windowname):
 	# Not needed under linux
 	return dict()
 
-class OutputHandler():
+class OutputHandler(object):
 
 	def __init__(self):
 		self.keyboard_control = None

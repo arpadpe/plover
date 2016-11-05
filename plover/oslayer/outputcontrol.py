@@ -23,3 +23,15 @@ def get_open_windows():
 
 def get_window_child_handles(windowname):
 	return outputhandler.get_window_child_handles(windowname)
+
+def get_window_child_handles_for_pattern(windowname):
+	return outputhandler.get_window_child_handles_for_pattern(windowname)
+
+def window_found(windowname):
+	return outputhandler.window_found(windowname)
+
+def send_test_text(hwnd=None, windowname=None, handlename=None, text='test'):
+	outputhandler.send_test_text(hwnd, windowname, handlename, text)
+
+def get_handle_for_window(filename, window):
+	return outputhandler.get_handle_for_window(filename, window)

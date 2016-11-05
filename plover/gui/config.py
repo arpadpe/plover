@@ -16,7 +16,7 @@ from plover.gui.serial_config import SerialConfigDialog
 import plover.gui.add_translation
 import plover.gui.lookup
 import plover.gui.dictionary_editor
-import plover.gui.secondary_flow_editor
+import plover.gui.output_flow
 from plover import log
 from plover.app import update_engine
 from plover.machine.registry import machine_registry
@@ -26,6 +26,7 @@ from plover.gui.suggestions import SuggestionsDisplayDialog
 from plover.gui.keyboard_config import KeyboardConfigDialog
 #import plover.gui.main
 from plover.misc import SimpleNamespace
+import plover.oslayer.outputcontrol as outputcontrol
 
 
 EDIT_BUTTON_NAME = "Dictionary Editor"
@@ -177,9 +178,8 @@ class ConfigurationDialog(wx.Dialog):
         self.output_config.save()
         self.multiple_output_config.save()
 
-        self.parent._update_flows(self.engine, old_config, self.config)
-
         try:
+            self.parent._update_flows(self.engine, self.config)
             update_engine(self.engine, self.config)
         except Exception:
             log.error('updating engine configuration failed', exc_info=True)
@@ -721,10 +721,11 @@ class MultipleOutputConfig(ScrolledPanel):
         parent -- This component's parent component.
 
         """
-        ScrolledPanel.__init__(self, parent, size=CONFIG_PANEL_SIZE)
+        ScrolledPanel.__init__(self, parent)
         self.engine = engine
         self.config = config
         self.flows = []
+        self.flow_controls = []
         
         self.remove_bitmap = wx.Bitmap(REMOVE_IMAGE_FILE, wx.BITMAP_TYPE_PNG)
         self.edit_bitmap = wx.Bitmap(EDIT_IMAGE_FILE, wx.BITMAP_TYPE_PNG)
@@ -734,15 +735,19 @@ class MultipleOutputConfig(ScrolledPanel):
         button = wx.Button(self, wx.ID_ANY, self.ADD_BUTTON_TEXT)
         main_sizer.Add(button, border=UI_BORDER, flag=wx.ALL)
 
-        self.flows_count = self.config.get_flows_count()
-
         next_index = lambda : len(self.flows)
-        button.Bind(wx.EVT_BUTTON, lambda e: wx.CallAfter(self.show_edit, next_index() ))
+        button.Bind(wx.EVT_BUTTON, lambda e: wx.CallAfter(self.show_edit, next_index()))
 
         self.flow_sizer = wx.BoxSizer(wx.VERTICAL)
-        for i in range(0, self.flows_count):
-            flow = self.config.get_output_window(i)
-            self.update_row(flow, i)
+        for i in range(0, self.config.get_flows_count()):
+            flow_control = {'window':self.config.get_output_window(i),
+                            'enabled':self.config.get_output_enabled(i) and self.get_output_available(self.config.get_output_window(i)),
+                            'translated':self.config.get_output_translated(i),
+                            'dict_reversed':self.config.get_output_dictionary_order_reversed(i),
+                            'send_backspaces':self.config.get_output_send_backspaces(i),
+                            'index':i }
+            self.flow_controls.append(flow_control)
+            self.update_row(flow_control)
 
         main_sizer.Add(self.flow_sizer)
                 
@@ -752,25 +757,41 @@ class MultipleOutputConfig(ScrolledPanel):
     def save(self):
         """Write all parameters to the config."""
         self.config.set_flows_count(len(self.flows))
-        
+        for flow_control in self.flow_controls:
+            self.config.set_output_window(flow_control['window'], flow_control['index'])
+            self.config.set_output_enabled(flow_control['enabled'], flow_control['index'])
+            self.config.set_output_translated(flow_control['translated'], flow_control['index'])
+            self.config.set_output_dictionary_order_reversed(flow_control['dict_reversed'], flow_control['index'])
+            self.config.set_output_send_backspaces(flow_control['send_backspaces'], flow_control['index'])
+
     def show_edit(self, index):
-        print index
-        plover.gui.secondary_flow_editor.Show(self.config, self, index)
+        flow_control = dict()
+        if index < len(self.flow_controls):
+            flow_control =self.flow_controls[index]
+        else:
+            flow_control = {'window':'',
+                            'enabled':True,
+                            'translated':True,
+                            'dict_reversed':False,
+                            'send_backspaces':True,
+                            'index':index }
+        plover.gui.output_flow.Show(self.config, self, flow_control)
         
-    def update_row(self, flow, index):
+    def update_row(self, flow_control):
+        index = flow_control['index']
         if index < len(self.flows):
             sizer = self.flows[index]
             sizer.DeleteWindows()
-        else:            
+        else:
             sizer = wx.BoxSizer(wx.HORIZONTAL)
             self.flow_sizer.Add(sizer)
             self.flows.append(sizer)
 
         output_enabled = wx.CheckBox(self)
-        output_enabled.SetValue(self.config.get_output_enabled(index))
+        output_enabled.SetValue(flow_control['enabled'])
         sizer.Add(output_enabled, border=UI_BORDER, flag=wx.ALL)
 
-        output_enabled.Bind(wx.EVT_CHECKBOX, lambda e: wx.CallAfter(self.update_enabled, flow, index, output_enabled.GetValue()))
+        output_enabled.Bind(wx.EVT_CHECKBOX, lambda e: wx.CallAfter(self.update_enabled, flow_control, output_enabled.GetValue()))
 
         edit_button = wx.BitmapButton(self, bitmap=self.edit_bitmap)
         edit_button.Bind(wx.EVT_BUTTON, lambda e: wx.CallAfter(self.show_edit, index))
@@ -780,65 +801,60 @@ class MultipleOutputConfig(ScrolledPanel):
         remove_button.Bind(wx.EVT_BUTTON, lambda e: wx.CallAfter(self.remove_row, index))
         sizer.Add(remove_button, border=UI_BORDER, flag=wx.LEFT)
 
-        if len(flow) > 220:
-            flow = flow[:220] + "\n" + flow[220:]
-        print flow
-        name_label = wx.StaticText(self, label=flow)
+        windowname = flow_control['window']
+        if len(windowname) > 220:
+            windowname = windowname[:220] + "\n" + windowname[220:]
+        name_label = wx.StaticText(self, label=windowname)
         sizer.Add(name_label, border=UI_BORDER, flag=wx.ALL)
 
         translated_label = wx.StaticText(self, label="Translated")
         sizer.Add(translated_label, border=UI_BORDER, flag=wx.LEFT | wx.TOP | wx.BOTTOM)
         translated_checkbox = wx.CheckBox(self)
-        translated_checkbox.SetValue(self.config.get_output_translated(index))
+        translated_checkbox.SetValue(flow_control['translated'])
         sizer.Add(translated_checkbox, border=UI_BORDER, flag=wx.ALL | wx.ALIGN_RIGHT)
 
-        translated_checkbox.Bind(wx.EVT_CHECKBOX, lambda e: wx.CallAfter(self.update_translation, flow, index, translated_checkbox.GetValue()))
+        translated_checkbox.Bind(wx.EVT_CHECKBOX, lambda e: wx.CallAfter(self.update_translation, flow_control, translated_checkbox.GetValue()))
 
         if output_enabled.GetValue():
-            edit_button.Enable()
-            remove_button.Enable()
             name_label.Enable()
             translated_label.Enable()
             translated_checkbox.Enable()
         else:
-            edit_button.Disable()
-            remove_button.Disable()
             name_label.Disable()
             translated_label.Disable()
             translated_checkbox.Disable()
 
+        if index < len(self.flow_controls):
+            self.flow_controls[index] = flow_control
+        else:
+            self.flow_controls.append(flow_control)
         if self.GetSizer():
             self.GetSizer().Layout()
 
-    def update_translation(self, flow, index, translated):
-        self.config.set_output_translated(translated, index)
-        self.update_row(flow, index)
+    def update_translation(self, flow_control, translated):
+        flow_control['translated'] = translated
+        self.update_row(flow_control)
 
-    def update_enabled(self, flow, index, enabled):
-        self.config.set_output_enabled(enabled, index)
-        self.update_row(flow, index)
+    def get_output_available(self, window):
+        if window == 'Focus window':
+            return True
+        open_windows = outputcontrol.get_open_windows()
+        return window in open_windows.keys()
+
+    def update_enabled(self, flow_control, enabled):
+        enabled = enabled and self.get_output_available(flow_control['window'])
+        flow_control['enabled'] = enabled
+        self.update_row(flow_control)
 
     def remove_row(self, index):
-        for i in range(index, len(self.flows) - 1):
-            translated = self.config.get_output_translated(i + 1)
-            self.config.set_output_translated(translated, i)
-
-            order_reversed = self.config.get_output_dictionary_order_reversed(i + 1)
-            self.config.set_output_dictionary_order_reversed(order_reversed, i)
-
-            windowname = self.config.get_output_window(i + 1)
-            self.config.set_output_window(windowname, i)
-
-            windowhandle = self.config.get_output_windows_handle(i + 1)
-            self.config.set_output_windows_handle(windowhandle, i)
-
-            self.add_row( windowname, i)
-
-            with open(self.config.target_file, 'wb') as f:
-                self.config.save(f)
-
+        for i in range(index, len(self.flow_controls) - 1):
+            index = self.flow_controls[i]['index']
+            self.flow_controls[i] = self.flow_controls[i+1]
+            self.flow_controls[i]['index'] = index
+            self.update_row(self.flow_controls[i])
         self.flows[-1].DeleteWindows()
         self.flow_sizer.Detach(self.flows[-1])
         del self.flows[-1]
+        del self.flow_controls[-1]
         self.GetSizer().Layout()
         

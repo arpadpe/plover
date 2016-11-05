@@ -147,14 +147,14 @@ FLOWS_COUNT = 'flows_count'
 DEFAULT_FLOWS_COUNT = 1
 OUTPUT_TRANSLATED = 'output_translated'
 DEFAULT_OUTPUT_TRANSLATED = True
+OUTPUT_SEND_BACKSPACES = 'output_send_backspaces'
+DEFAULT_OUTPUT_SEND_BACKSPACES = True
 OUTPUT_DICTIONARY_ORDER_REVERSED = 'output_dict_order_reversed'
 DEFAULT_OUTPUT_DICTIONARY_ORDER_REVERSED = False
 OUTPUT_ENABLED = 'output_enabled'
 DEFAULT_OUTPUT_ENABLED = True
 OUTPUT_WINDOW = 'output_window'
 DEFAULT_OUTPUT_WINDOW = 'Focus window'
-OUTPUT_WINDOWS_HANDLE = 'output_windows_handle'
-DEFAULT_OUTPUT_WINDOWS_HANDLE = ''
 WINDOWS_HANDLES_FILE_OPTION = 'windows_handles_file'
 DEFAULT_WINDOWS_HANDLES_FILE = os.path.join(ASSETS_DIR, 'windowshandles.json')
 
@@ -183,8 +183,6 @@ def raise_if_invalid_opacity(opacity):
 # TODO: Unit test this class
 
 class Config(object):
-
-    DEFAULT_OUTPUT_WINDOW = DEFAULT_OUTPUT_WINDOW
 
     def __init__(self):
         self._config = configparser.RawConfigParser()
@@ -599,6 +597,14 @@ class Config(object):
                               OUTPUT_DICTIONARY_ORDER_REVERSED + str(index),
                               DEFAULT_OUTPUT_DICTIONARY_ORDER_REVERSED)
 
+    def set_output_send_backspaces(self, send_backspaces, index):
+        self._set(MULTIPLE_OUTPUT_CONFIG_SECTION, OUTPUT_SEND_BACKSPACES + str(index), send_backspaces)
+
+    def get_output_send_backspaces(self, index):
+        return self._get_bool(MULTIPLE_OUTPUT_CONFIG_SECTION,
+                              OUTPUT_SEND_BACKSPACES + str(index),
+                              DEFAULT_OUTPUT_SEND_BACKSPACES)
+
     def set_output_window(self, window, index):
         self._set(MULTIPLE_OUTPUT_CONFIG_SECTION, OUTPUT_WINDOW + str(index), window)
 
@@ -607,34 +613,13 @@ class Config(object):
                          OUTPUT_WINDOW + str(index),
                          DEFAULT_OUTPUT_WINDOW)
 
-    def set_output_windows_handle(self, window_handle, index):
-        self._set(MULTIPLE_OUTPUT_CONFIG_SECTION, OUTPUT_WINDOWS_HANDLE + str(index), window_handle)
+    def set_windows_handles_filename(self, filename):
+        self._set(MULTIPLE_OUTPUT_CONFIG_SECTION, WINDOWS_HANDLES_FILE_OPTION, filename)
 
-    def get_output_windows_handle(self, index):
+    def get_windows_handles_filename(self):
         return self._get(MULTIPLE_OUTPUT_CONFIG_SECTION,
-                         OUTPUT_WINDOWS_HANDLE + str(index),
-                         DEFAULT_OUTPUT_WINDOWS_HANDLE)
-
-    def set_windows_handles(self, handles):
-        if self._config.has_section(DICTIONARY_CONFIG_SECTION):
-            self._config.remove_section(DICTIONARY_CONFIG_SECTION)
-        self._config.add_section(DICTIONARY_CONFIG_SECTION)
-        for ordinal, filename in enumerate(filenames, start=1):
-            option = DICTIONARY_FILE_OPTION + str(ordinal)
-            self._config.set(DICTIONARY_CONFIG_SECTION, option, filename)
-
-    def get_windows_handles(self):
-        
-        filenames = []
-        if self._config.has_section(DICTIONARY_CONFIG_SECTION):
-            options = filter(lambda x: x.startswith(DICTIONARY_FILE_OPTION),
-                             self._config.options(DICTIONARY_CONFIG_SECTION))
-            options.sort(key=_dict_entry_key)
-            filenames = [self._config.get(DICTIONARY_CONFIG_SECTION, o) 
-                         for o in options]
-        if not filenames or filenames == ['dict.json']:
-            filenames = [DEFAULT_DICTIONARY_FILE]
-        return filenames
+                         WINDOWS_HANDLES_FILE_OPTION,
+                         DEFAULT_WINDOWS_HANDLES_FILE)
 
     def _set(self, section, option, value):
         if not self._config.has_section(section):
