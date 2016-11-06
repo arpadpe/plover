@@ -184,6 +184,8 @@ def raise_if_invalid_opacity(opacity):
 
 class Config(object):
 
+    DEFAULT_OUTPUT_WINDOW = DEFAULT_OUTPUT_WINDOW
+
     def __init__(self):
         self._config = configparser.RawConfigParser()
         # A convenient place for other code to store a file name.

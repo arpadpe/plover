@@ -227,6 +227,7 @@ class MainFrame(wx.Frame):
 
         self.steno_engine.add_callback(
             lambda s: wx.CallAfter(self._update_status, s))
+        # TODO: remove output
         self.steno_engine.set_output( Output(self.consume_command, self.steno_engine))
 
         flows_count = self.config.get_flows_count()
@@ -265,6 +266,7 @@ class MainFrame(wx.Frame):
         for i in range(0, flows_count):
             engine.increment_flows()
 
+            output_set = True
             if config.get_output_window(i) == config.DEFAULT_OUTPUT_WINDOW:
                 output = Output(self.consume_command, engine)
             else:
@@ -272,13 +274,9 @@ class MainFrame(wx.Frame):
                                          engine, 
                                          config.get_output_send_backspaces(i), 
                                          self.windows_handles_filename)
-                # TODO add option to send '*' instead of backspace
-                try:
-                    output.set_output_window(config.get_output_window(i))
-                except Exception, e:
-                    # TODO ask for output window handle
-                    pass
-            output.set_enabled(config.get_output_enabled(i))
+                
+                output_set = output.set_output_window(config.get_output_window(i))
+            output.set_enabled(output_set and config.get_output_enabled(i))
             engine.set_flow_output(i, output)
 
     def consume_command(self, command):
@@ -411,7 +409,7 @@ class Output(object):
         self.enabled = enabled
 
     def send_backspaces(self, b):
-        if seld.enabled:
+        if self.enabled:
             wx.CallAfter(self._xcall, self.keyboard_control.send_backspaces, b)
 
     def send_string(self, t):
@@ -437,7 +435,7 @@ class SecondaryOutput(object):
         self.enabled = True
 
     def set_output_window(self, window):
-        self.output_control.set_output_location(window)
+        return self.output_control.set_output_location(window)
 
     def set_enabled(self, enabled):
         self.enabled = enabled

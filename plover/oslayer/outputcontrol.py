@@ -35,3 +35,12 @@ def send_test_text(hwnd=None, windowname=None, handlename=None, text='test'):
 
 def get_handle_for_window(filename, window):
 	return outputhandler.get_handle_for_window(filename, window)
+
+def get_handle_needed():
+	if sys.platform.startswith('win32'):
+		return True
+	elif sys.platform.startswith('linux'):
+		return False
+	elif sys.platform.startswith('darwin'):
+		return False
+	

@@ -135,7 +135,7 @@ class OutputHandler(object):
 
 		if window not in window_handles.keys():
 			#  TODO: raise???
-			return
+			return False
 
 		for key, value in self.window_handles_regex.items():
 			if key.search(window):
@@ -144,12 +144,13 @@ class OutputHandler(object):
 
 		try:
 			self.destinationHwnd = window_handles[window][window_handle]
-			return
+			return True
 		except Exception as e:
 			pattern = re.compile(re.escape(window_handle), re.IGNORECASE)
 			for handle,hwnd in window_handles[window].values().items():
 				if pattern.match(handle):
 					self.destinationHwnd = hwnd
-					return
+					return False
 
 		# TODO: if no handler found raise???
+		return False

@@ -42,6 +42,9 @@ class OutputFlowDialog(wx.Dialog):
         self.config = config
         self.parent = parent
         self.flow_control = flow_control
+        self.index = flow_control['index']
+
+        self.display_handle_config = outputcontrol.get_handle_needed()
 
         # Close all other instances.
         if self.other_instances:
@@ -75,13 +78,14 @@ class OutputFlowDialog(wx.Dialog):
         self.Bind(wx.EVT_CHOICE, self._update, self.window_choice)
         sizer.Add(window_name_box, border=UI_BORDER, flag=wx.ALL | wx.EXPAND)
         
-        self.window_handle_box = wx.BoxSizer(wx.HORIZONTAL)
-        sizer.Add(self.window_handle_box, border=UI_BORDER, flag=wx.ALL | wx.EXPAND)
+        if self.display_handle_config:
+            self.window_handle_box = wx.BoxSizer(wx.HORIZONTAL)
+            sizer.Add(self.window_handle_box, border=UI_BORDER, flag=wx.ALL | wx.EXPAND)
         
-        handles_editor_button = wx.Button(self, label=HANDLES_EDITOR_BUTTON_NAME)
-        handles_editor_button.Bind(wx.EVT_BUTTON, self._show_handles_editor)
+            handles_editor_button = wx.Button(self, label=HANDLES_EDITOR_BUTTON_NAME)
+            handles_editor_button.Bind(wx.EVT_BUTTON, self._show_handles_editor)
 
-        sizer.Add(handles_editor_button, flag=wx.ALL | wx.ALIGN_RIGHT, border=UI_BORDER)
+            sizer.Add(handles_editor_button, flag=wx.ALL | wx.ALIGN_RIGHT, border=UI_BORDER)
 
         # The bottom button container
         button_sizer = wx.StdDialogButtonSizer()
@@ -112,6 +116,8 @@ class OutputFlowDialog(wx.Dialog):
 
     def _update(self, event=None):
         self.save_button.Enable(self.save_button_enabled())
+        if not self.display_handle_config:
+            return
         self.window_handle_box.DeleteWindows()
         windowname = self.window_choice.GetStringSelection()
         if windowname == 'Focus window':
@@ -131,7 +137,7 @@ class OutputFlowDialog(wx.Dialog):
                 
     def save_button_enabled(self):
         windowname = self.window_choice.GetStringSelection()
-        if windowname == 'Focus window':
+        if windowname and (windowname == 'Focus window' or not self.display_handle_config):
             return True
         if windowname:
             window_handle = outputcontrol.get_handle_for_window(self.config.get_windows_handles_filename(), windowname)

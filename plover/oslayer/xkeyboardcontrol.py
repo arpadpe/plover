@@ -32,6 +32,7 @@ from six import text_type, unichr
 from Xlib import X, XK, display
 from Xlib.ext import xinput, xtest
 from Xlib.ext.ge import GenericEventCode
+from Xlib.protocol import rq, event
 
 from plover.key_combo import add_modifiers_aliases, parse_key_combo
 from plover import log
@@ -1114,6 +1115,7 @@ class KeyboardEmulation(object):
         self.display = display.Display()
         self.time = 0
         self._update_keymap()
+        self.target_window = target_window
 
     def _update_keymap(self):
         '''Analyse keymap, build a mapping of keysym to (keycode + modifiers),
@@ -1184,8 +1186,11 @@ class KeyboardEmulation(object):
 
         """
         for x in range(number_of_backspaces):
-            self._send_keycode(self.backspace_mapping.keycode,
-                               self.backspace_mapping.modifiers)
+            if self.target_window:
+                self._send_to_window(self.target_window, self.backspace_mapping.keycode, self.backspace_mapping.modifiers)
+            else:
+                self._send_keycode(self.backspace_mapping.keycode,
+                                   self.backspace_mapping.modifiers)
         self.display.sync()
 
     def send_string(self, s):
@@ -1204,8 +1209,13 @@ class KeyboardEmulation(object):
             mapping = self._get_mapping(keysym)
             if mapping is None:
                 continue
-            self._send_keycode(mapping.keycode,
-                               mapping.modifiers)
+            if self.target_window:
+
+                self._send_to_window(self.target_window, mapping.keycode, mapping.modifiers)
+
+            else:
+                self._send_keycode(mapping.keycode,
+                                   mapping.modifiers)
         self.display.sync()
 
     def send_key_combination(self, combo_string):
@@ -1252,6 +1262,7 @@ class KeyboardEmulation(object):
         Control, and Alt.
 
         """
+        
         modifiers_list = [
             self.modifier_mapping[n][0]
             for n in range(8)
@@ -1266,29 +1277,40 @@ class KeyboardEmulation(object):
         # Release modifiers.
         for mod_keycode in reversed(modifiers_list):
             xtest.fake_input(self.display, X.KeyRelease, mod_keycode)
-			
 
-#		if self.target_window:
-#            target_window = self.target_window
-#        else:
-#            target_window = self.display.get_input_focus().focus
-#
+    def _send_to_window(self, target_window, keycode, modifiers):
+
+        self._send_key_event(target_window, keycode, modifiers, event.KeyPress)
+        self._send_key_event(target_window, keycode, modifiers, event.KeyRelease)
+
+    def _send_key_event(self, target_window, keycode, modifiers, event_class):
+        """Simulate a key press or release.
+        These events are not detected by KeyboardCapture.
+        Arguments:
+        keycode -- An integer in the inclusive range [8-255].
+        modifiers -- An 8-bit bit mask indicating if the key pressed
+        is modified by other keys, such as Shift, Capslock, Control,
+        and Alt.
+        event_class -- One of Xlib.protocol.event.KeyPress or
+        Xlib.protocol.event.KeyRelease.
+        """
+
         # Make sure every event time is different than the previous one, to
         # avoid an application thinking its an auto-repeat.
-#        self.time = (self.time + 1) % 4294967295
-#        key_event = event_class(detail=keycode,
-#                                 time=self.time,
-#                                 root=self.display.screen().root,
-#                                 window=target_window,
-#                                 child=X.NONE,
-#                                 root_x=1,
-#                                 root_y=1,
-#                                 event_x=1,
-#                                 event_y=1,
-#                                 state=modifiers,
-#                                 same_screen=1
-#                                 )
-#        target_window.send_event(key_event)
+        self.time = (self.time + 1) % 4294967295
+        key_event = event_class(detail=keycode,
+                                 time=self.time,
+                                 root=self.display.screen().root,
+                                 window=target_window,
+                                 child=X.NONE,
+                                 root_x=1,
+                                 root_y=1,
+                                 event_x=1,
+                                 event_y=1,
+                                 state=modifiers,
+                                 same_screen=1
+                                 )
+        target_window.query_tree().children[0].send_event(key_event)
 
 
     def _get_keycode_from_keystring(self, keystring):
