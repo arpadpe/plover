@@ -95,14 +95,14 @@ class HandleEditorStore(object):
                 self.filtered_keys.append(item)
         self._applySort()
 
-    def InsertNew(self, row, window, handle):
+    def InsertNew(self, window, handle):
         self.pending_changes = True
         item = HandleItem(window, handle, self.new_id)
         self.all_keys.append(item)
-        self.sorted_keys.insert(row, item)
+        self.sorted_keys.append(item)
         self.new_id -= 1
 
-    def UpdateSelected(self, row, window, handle):
+    def UpdateItem(self, row, window, handle):
         self.pending_changes = True
         editing_item = self.sorted_keys[row]
         if editing_item.window != window:
@@ -122,7 +122,7 @@ class HandleEditorStore(object):
 
             handles = dict()
             for item in self.all_keys:
-                handles[item.window] = item.handle
+                handles[unicode(item.window)] = unicode(item.handle)
 
             handle_loader.save_window_handles(self.handles_filename, handles)
 

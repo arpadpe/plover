@@ -154,18 +154,22 @@ class HandleEditor(wx.Dialog):
         dlg.Show()
 
     def _edit(self, event=None):
-        self.grid.UpdateSelected()
+        row = self.grid.Selected()
+        if row > -1:
+            item = {'window':self.grid.GetValue(row, COL_WINDOW),
+                    'handle':self.grid.GetValue(row, COL_HANDLE),
+                    'id':row }
+            dlg = AddHandleConfigurationDialog(config=self.config, parent=self, item=item)
+            dlg.Show()
+
+    def _update(self, item):
+        if item['id'] > 0:
+            self.grid.UpdateItem(item['id'], item['window'], item['handle'])
+        else:
+            self.grid.InsertNew(item['window'], item['handle'])
 
     def _delete(self, event=None):
-        delete_selection = [row for row in self.selection
-                            if not self.store.is_row_read_only(row)]
-        if delete_selection:
-
-            # Delete in reverse order, so row numbers are stable.
-            for row in sorted(delete_selection, reverse=True):
-                self.store.DeleteSelected(row)
-            self._table.ResetView(self)
-        self.ClearSelection()
+        self.grid.DeleteSelected()
 
     def _save_close(self, event=None):
         self.store.SaveChanges()
@@ -214,7 +218,7 @@ class HandleEditorGrid(wx.grid.Grid):
 
         # We need to keep track of the selection ourselves...
         self.Bind(EVT_GRID_SELECT_CELL, self._on_select_cell)
-        self.selection = set()
+        self.selection = -1
 
     def CreateGrid(self, store, rows, cols):
         """ Create the grid """
@@ -238,36 +242,32 @@ class HandleEditorGrid(wx.grid.Grid):
     def RefreshView(self):
         self._table.ResetView(self)
 
-    def InsertNew(self):
-        for row in self.selection:
-            if not self.store.is_row_read_only(row):
-                self.store.InsertNew(row)
-                self._table.ResetView(self)
-                self.SetFocus()
-                self.ClearSelection()
-                self.SelectRow(row)
-                self.SetGridCursor(row, 0)
-                self.MakeCellVisible(row, 0)
-                break
-        else:
-            self.ClearSelection()
+    def InsertNew(self, window, handle):
+        self.store.InsertNew(window, handle)
+        self._table.ResetView(self)
 
-    def UpdateSelected(self):
-        if self.selection:
-
-        updatee_selection = [row for row in self.selection
-                            if not self.store.is_row_read_only(row)]
-        if delete_selection:
-            # Delete in reverse order, so row numbers are stable.
-            for row in sorted(delete_selection, reverse=True):
-                self.store.DeleteSelected(row)
-            self._table.Reset
+    def UpdateItem(self, row, window, handle):
+        self.store.UpdateItem(row, window, handle)
+        self._table.ResetView(self)
+        self.ClearSelection()
 
     def DeleteSelected(self):
-        if self.selection:
+        if self.selection > -1:
             self.store.DeleteSelected(self.selection)
         self._table.ResetView(self)
         self.ClearSelection()
+
+    def ClearSelection(self):
+        self.selection = -1
+
+    def GetValue(self, row, col):
+        return self._table.GetValue(row, col)
+
+    def SetValue(self, row, col, value):
+        self._table.SetValue(row, col, value)
+
+    def Selected(self):
+        return self.selection
 
     def _onLabelClick(self, evt):
         """ Handle Grid label click"""
@@ -436,7 +436,8 @@ class AddHandleConfigurationDialog(wx.Dialog):
         sizer = wx.BoxSizer(wx.VERTICAL)
         
         self.windows = outputcontrol.get_open_windows()
-        del self.windows['Focus window']
+        if 'Focus window' in self.windows:
+            del self.windows['Focus window']
 
         self.window_name_box = wx.BoxSizer(wx.HORIZONTAL)
         self.window_name_box.Add(wx.StaticText(self, label=self.WINDOW_TEXT), border=self.COMPONENT_SPACE, flag=wx.ALIGN_RIGHT | wx.ALIGN_CENTER_VERTICAL | wx.RIGHT)
@@ -459,15 +460,30 @@ class AddHandleConfigurationDialog(wx.Dialog):
 
         self.window_handle_box = wx.BoxSizer(wx.HORIZONTAL)
         self.window_handle_box.Add(wx.StaticText(self, label=self.HANDLE_TEXT), border=self.COMPONENT_SPACE, flag=wx.ALIGN_RIGHT | wx.ALIGN_CENTER_VERTICAL | wx.RIGHT)
-        self.handle_combo = wx.ComboBox(self, style=wx.CB_DROPDOWN|wx.CB_READONLY)
+        self.window_handles = []
+        window_choice = self.window_combo.GetValue()
+        if window_choice:
+            if outputcontrol.window_found(window_choice):
+                self.windows = outputcontrol.get_open_windows()
+                windowname = window_choice
+                if window_choice not in self.windows.keys():
+                    pattern = re.compile(re.escape(window_choice), re.IGNORECASE)
+                    for window in self.windows.keys():
+                        if pattern.search(window):
+                            windowname = window
+                            break
+                self.window_handles = outputcontrol.get_window_child_handles(self.windows[windowname]).keys()
+            
+        self.handle_combo = wx.ComboBox(self, choices=self.window_handles, style=wx.CB_DROPDOWN|wx.TE_PROCESS_ENTER)
         if item:
             self.handle_combo.SetValue(self.item['handle'])
         self.Bind(wx.EVT_COMBOBOX, self._update, self.handle_combo)
+        self.Bind(wx.EVT_TEXT_ENTER, self._update, self.handle_combo)
         self.window_handle_box.Add(self.handle_combo, proportion=1, flag=wx.EXPAND)
         sizer.Add(self.window_handle_box, border=self.UI_BORDER, flag=wx.ALL | wx.EXPAND)
 
         self.test_button = wx.Button(self, label=self.SEND_TEST_STRING_TEXT)
-        self.test_button.Enable(self._buttons_enabled())
+        self.test_button.Enable(self._test_button_enabled())
         sizer.Add(self.test_button, flag=wx.ALL | wx.ALIGN_RIGHT, border=self.UI_BORDER)        
 
         # The bottom button container
@@ -509,7 +525,6 @@ class AddHandleConfigurationDialog(wx.Dialog):
             window_choice = self.window_combo.GetValue()
             if window_choice:
                 if not outputcontrol.window_found(window_choice):
-                    self._show_error_alert("Window not found")
                     return
                 self.windows = outputcontrol.get_open_windows()
                 windowname = window_choice
@@ -529,7 +544,7 @@ class AddHandleConfigurationDialog(wx.Dialog):
                     self.window_handle_box.Add(self.handle_combo, proportion=1, flag=wx.EXPAND)
                     self.GetSizer().Layout()
 
-        self.test_button.Enable(self._buttons_enabled())
+        self.test_button.Enable(self._test_button_enabled())
         self.save_button.Enable(self._buttons_enabled())
 
     def _refresh_windows(self, event=None):
@@ -548,6 +563,23 @@ class AddHandleConfigurationDialog(wx.Dialog):
     def _buttons_enabled(self):
         return not (not self.window_combo.GetValue() or not self.handle_combo.GetValue())
 
+    def _test_button_enabled(self):
+        if not self.window_combo.GetValue() or not self.handle_combo.GetValue():
+            return False
+        window_choice = self.window_combo.GetValue()
+        if not outputcontrol.window_found(window_choice):
+            return False
+        self.windows = outputcontrol.get_open_windows()
+        windowname = window_choice
+        if window_choice not in self.windows.keys():
+            pattern = re.compile(re.escape(window_choice), re.IGNORECASE)
+            for window in self.windows.keys():
+                if pattern.search(window):
+                    windowname = window
+                    break
+        self.window_handles = outputcontrol.get_window_child_handles(self.windows[windowname]).keys()
+        return self.handle_combo.GetValue() in self.window_handles
+
     def send_test_text(self, event=None):
         try:
             outputcontrol.send_test_text(windowname=self.window_combo.GetValue(), handlename=self.handle_combo.GetValue())
@@ -556,7 +588,9 @@ class AddHandleConfigurationDialog(wx.Dialog):
 
     def _save(self, event=None):
         # TODO: save new window:handle pair
-        item = {'window':self.window_combo.GetValue(), 'handle':self.handle_combo.GetValue()}
+        item = {'window':self.window_combo.GetValue(), 
+                'handle':self.handle_combo.GetValue(),
+                'id':self.item.id if self.item else -1}
         self.parent._update(item)
         self.Close()
         
