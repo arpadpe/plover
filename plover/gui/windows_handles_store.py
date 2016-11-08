@@ -116,8 +116,7 @@ class HandleEditorStore(object):
         self.sorted_keys.remove(item)
 
     def SaveChanges(self):
-        if True:
-        #if self.pending_changes:
+        if self.pending_changes:
             self.pending_changes = False
 
             handles = dict()
