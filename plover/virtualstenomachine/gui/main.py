@@ -44,7 +44,8 @@ class MainFrame(wx.Frame):
 	CONFIG_BUTTON_BORDER = 200
 	START_BUTTON_LABEL = "Start"
 	STOP_BUTTON_LABEL = "Stop"
-	CONFIGURE_BUTTON_LABEL = "Configure"
+	CONFIGURE_INPUT_BUTTON_LABEL = "Configure Input"
+	CONFIGURE_OUTPUT_BUTTON_LABEL = "Configure Output"
 	INPUT_TEXT_DEFAULT = "Input:"
 	OUTPUT_TEXT_DEFAULT = "Output:"
 
@@ -64,11 +65,11 @@ class MainFrame(wx.Frame):
 		self.stop_button.Disable()
 		
 		# Input config button
-		self.input_cfg_button = wx.Button(self, label=self.CONFIGURE_BUTTON_LABEL)
+		self.input_cfg_button = wx.Button(self, label=self.CONFIGURE_INPUT_BUTTON_LABEL)
 		self.input_cfg_button.Bind(wx.EVT_BUTTON, self._show_input_configuration)
 		
 		# Output config button
-		self.output_cfg_button = wx.Button(self, label=self.CONFIGURE_BUTTON_LABEL)
+		self.output_cfg_button = wx.Button(self, label=self.CONFIGURE_OUTPUT_BUTTON_LABEL)
 		self.output_cfg_button.Bind(wx.EVT_BUTTON, self._show_output_configuration)
 		
 		self.machine = VirtualStenotypeMachine()
@@ -124,8 +125,8 @@ class MainFrame(wx.Frame):
 		output_info_text = self.machine.get_output_info()
 		self.output_info = wx.StaticText(self, label=output_info_text)
 		self.output_sizer.Add(self.output_info)
-		
-		if (input_info_text is not self.INPUT_TEXT_DEFAULT) and (output_info_text is not self.OUTPUT_TEXT_DEFAULT):
+
+		if (input_info_text != self.INPUT_TEXT_DEFAULT) and (output_info_text != self.OUTPUT_TEXT_DEFAULT):
 			self.start_button.Enable()
 			self.stop_button.Enable()
 		else:
@@ -201,7 +202,7 @@ class InputConfigurationDialog(wx.Dialog):
 		"""
 
 		pos = (400, 400)
-		size = wx.Size(400, 400)
+		size = wx.Size(400, 200)
 		wx.Dialog.__init__(self, parent, title=self.CONFIGURATION_TITLE, pos=pos, size=size, style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
 		self.machine = machine
 		self.parent = parent
@@ -215,8 +216,6 @@ class InputConfigurationDialog(wx.Dialog):
 		del self.other_instances[:]
 		
 		self.other_instances.append(self)
-
-		sizer = wx.BoxSizer(wx.VERTICAL)
 
 		sizer = wx.BoxSizer(wx.VERTICAL)
 		box = wx.BoxSizer(wx.HORIZONTAL)
@@ -269,6 +268,17 @@ class InputConfigurationDialog(wx.Dialog):
 				self.file_browser.SetValue(self.machine.get_input_params()['filename'])
 			box.Add(self.file_browser, border=UI_BORDER, flag=wx.ALL | wx.EXPAND)
 			sizer.Add(box, border=UI_BORDER, flag=wx.ALL | wx.EXPAND)
+			
+			box = wx.BoxSizer(wx.HORIZONTAL)
+			box.Add(wx.StaticText(self, label="File delimiter: "), border=UI_BORDER, flag=wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL | wx.LEFT)
+			self.delimiter_textctrl = wx.TextCtrl(self)
+			if 'delimiter' in self.machine.get_input_params():
+				self.delimiter_textctrl.SetValue(self.machine.get_input_params()['delimiter'])
+			else:
+				self.delimiter_textctrl.SetValue(';')
+			box.Add(self.delimiter_textctrl, border=UI_BORDER)
+			sizer.Add(box, border=UI_BORDER, flag=wx.ALL | wx.EXPAND)
+
 			button = wx.Button(self, wx.ID_SAVE, SAVE_CONFIG_BUTTON_NAME) 
 			self.Bind(wx.EVT_BUTTON, self._file_input, button)
 			sizer.Add(button, flag=wx.ALIGN_RIGHT)
@@ -321,8 +331,9 @@ class InputConfigurationDialog(wx.Dialog):
 		
 	def _file_input(self, event=None):
 		filename = self.file_browser.GetValue()
+		delimiter = self.delimiter_textctrl.GetValue()
 		try:
-			self.machine.set_input_type(virtualmachine.MACHINE_INPUT_FILE, { 'filename' : filename})
+			self.machine.set_input_type(virtualmachine.MACHINE_INPUT_FILE, { 'filename' : filename, 'delimiter' : delimiter})
 			if self.IsModal():
 				self.EndModal(wx.ID_SAVE)
 			else:
@@ -411,7 +422,7 @@ class OutputConfigurationDialog(wx.Dialog):
 		"""
 
 		pos = (400, 400)
-		size = wx.Size(400, 400)
+		size = wx.Size(400, 200)
 		wx.Dialog.__init__(self, parent, title=self.CONFIGURATION_TITLE, pos=pos, size=size, style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
 		self.machine = machine
 		self.parent = parent
@@ -470,7 +481,7 @@ class OutputConfigurationDialog(wx.Dialog):
 			box = wx.BoxSizer(wx.HORIZONTAL)
 			machines = self.machine.get_serial_output_types()
 			self.machine_choice = wx.Choice(self, choices=machines)
-			if 'machine_type' in self.machine.get_input_params():
+			if 'machine_type' in self.machine.get_output_params():
 				self.machine_choice.SetStringSelection(self.machine.get_output_params()['machine_type'])
 			if 'machine_options' in self.machine.get_output_params():
 				self.machine_params = self.machine.get_output_params()['machine_options']
