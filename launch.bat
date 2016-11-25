@@ -1,4 +1,3 @@
 @pushd %~dp0
-setup.py launch -- %*
+python.exe setup.py launch -- %*
 @popd
-@pause Press a key to close this window.

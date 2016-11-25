@@ -29,7 +29,7 @@ class VirtualStenotypeMachine ():
 		
 	def set_input_type(self, input_type, params):
 		if input_type == MACHINE_INPUT_FILE:
-			self.input = MachineInputFile(params['filename'], params['delimiter'])
+			self.input = MachineInputFile(params['filename'])
 		elif input_type == MACHINE_INPUT_NETWORK:
 			self.input = MachineInputNetwork(params['host'], params['port'])
 		elif input_type == MACHINE_INPUT_PHYSICAL:

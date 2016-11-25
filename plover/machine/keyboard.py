@@ -22,7 +22,6 @@ class Keyboard(StenotypeBase):
     def __init__(self, params):
         """Monitor the keyboard's events."""
         super(Keyboard, self).__init__()
-        print 'params', params
         self.arpeggiate = params['arpeggiate']
         self._bindings = {}
         self._down_keys = set()
@@ -33,7 +32,6 @@ class Keyboard(StenotypeBase):
 
     def _update_bindings(self):
         self._bindings = dict(self.keymap.get_bindings())
-        print '_bindings', self._bindings
         for key, mapping in list(self._bindings.items()):
             if 'no-op' == mapping:
                 self._bindings[key] = None
@@ -46,13 +44,11 @@ class Keyboard(StenotypeBase):
                     del self._bindings[key]
 
     def set_mappings(self, mappings):
-        print 'mappings', mappings
         super(Keyboard, self).set_mappings(mappings)
         self._update_bindings()
 
     def start_capture(self):
         """Begin listening for output from the stenotype machine."""
-        print 'start capture'
         self._released_keys.clear()
         self._last_stroke_key_down_count = 0
         self._initializing()
@@ -82,7 +78,6 @@ class Keyboard(StenotypeBase):
 
     def _key_down(self, key):
         """Called when a key is pressed."""
-        print '_key_down'
         assert key is not None
         if key in self._bindings:
             self._last_stroke_key_down_count += 1
@@ -92,7 +87,6 @@ class Keyboard(StenotypeBase):
 
     def _key_up(self, key):
         """Called when a key is released."""
-        print '_key_up'
         assert key is not None
         steno_key = self._bindings.get(key)
         if steno_key is not None:
@@ -105,9 +99,6 @@ class Keyboard(StenotypeBase):
         # If we are in arpeggiate mode then only send stroke when spacebar is pressed.
         send_strokes = bool(self._down_keys and
                             self._down_keys == self._released_keys)
-        print 'send_strokes', send_strokes
-        print 'arpeggiate', self.arpeggiate
-        print '_down_keys', self._down_keys
         if self.arpeggiate:
             send_strokes &= key == self._arpeggiate_key
         if send_strokes:

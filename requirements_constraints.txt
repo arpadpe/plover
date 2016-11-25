@@ -1,1 +1,0 @@
-git+https://github.com/benoit-pierre/pyobjc.git@pyobjc-3.1.1+plover#egg=pyobjc-core&subdirectory=pyobjc-core

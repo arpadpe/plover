@@ -168,7 +168,6 @@ class Translator(object):
 
     def translate(self, stroke):
         """Process a single stroke."""
-        print 'Translator stroke ' 
         self._translate_stroke(stroke)
         self._resize_translations()
 

@@ -13,31 +13,31 @@ from plover.virtualstenomachine.machine.base import VirtualStenotypeBase
 STENO_KEY_CHART = {
     '#': '#',
     'S-': 'S',
-    'S-':'C',
-    'T-':'T',
-    'K-':'K',
-    'P-':'P',
-    'W-':'W',
-    'H-':'H',
-    'R-':'R',
-    '*':'*',
-    'A-':'A',
-    'O-':'O',
-    '-E':'E',
-    '-U':'U',
-    '-F':'F',
-    '-R':'Q',
-    '-P':'N',
-    '-B':'B',
-    '-L':'L',
-    '-G':'G',
-    '-T':'Y',
-    '-S':'X',
-    '-D':'D',
+    'S-':'C'
+    'T-':'T'
+    'K-':'K'
+    'P-':'P'
+    'W-':'W'
+    'H-':'H'
+    'R-':'R'
+    '*':'*'
+    'A-':'A'
+    'O-':'O'
+    '-E':'E'
+    '-U':'U'
+    '-F':'F'
+    '-R':'Q'
+    '-P':'N'
+    '-B':'B'
+    '-L':'L'
+    '-G':'G'
+    '-T':'Y'
+    '-S':'X'
+    '-D':'D'
     '-Z':'Z'
 }
 
-#STENO_KEY_CHART = {value : key for key, value in passport.STENO_KEY_CHART.items() if value}
+STENO_KEY_CHART = {value : key for key, value in passport.STENO_KEY_CHART.items() if value}
 
 class VirtualStenotypePassport(VirtualStenotypeBase):
 	"""Passport interface."""
@@ -85,4 +85,4 @@ class VirtualStenotypePassport(VirtualStenotypeBase):
 		}
 
 	def __repr__(self):
-		return "VirtualStenotypePassport(%s)" % self.params
+    	return "VirtualStenotypePassport(%s)" % self.params
