@@ -50,5 +50,5 @@ class VirtualStenotypeGeminiPr(VirtualStenotypeBase):
 		del key_sets[:]
 
 	def __repr__(self):
-    	return "VirtualStenotypeGeminiPr(%s)" % self.params
+		return "VirtualStenotypeGeminiPr(%s)" % self.params
 			

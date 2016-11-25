@@ -48,10 +48,11 @@ class MachineInputBase(object):
 class MachineInputFile(MachineInputBase):
 	"""The file input class for stenotype machine input"""
 
-	def __init__(self, filename):
+	def __init__(self, filename, delimiter=None):
 		if not os.path.isfile(filename):
 			self._error("File not found")
 		self.filename = filename
+		self.delimiter = delimiter if delimiter is not None else '\n'
 		try:
 			MachineInputBase.__init__(self)
 			self.file = open(filename, 'r')
@@ -60,7 +61,7 @@ class MachineInputFile(MachineInputBase):
 		
 	def start_input(self, done):
 		for line in self.file:
-			for input in line.strip().split(';'):
+			for input in line.strip().split(self.delimiter):
 				if input:
 					self._notify(input)
 		done()

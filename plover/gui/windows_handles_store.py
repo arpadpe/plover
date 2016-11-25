@@ -114,6 +114,7 @@ class HandleEditorStore(object):
         self.pending_changes = True
         item = self.sorted_keys[row]
         self.sorted_keys.remove(item)
+        self.all_keys.remove(item)
 
     def SaveChanges(self):
         if self.pending_changes:

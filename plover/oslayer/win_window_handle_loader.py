@@ -20,6 +20,7 @@ def load_window_handles(filename):
 
 
 def save_window_handles(filename, handles):
-	with io.open(filename, 'w', encoding=encoding) as fp:
-		window_handles = json.dumps(handles)
-		fp.write(window_handles.encode('utf-8'))
+    print "save handles", handles
+    with io.open(filename, 'w', encoding='utf-8') as fp:
+        window_handles = json.dumps(handles)
+        fp.write(unicode(window_handles, 'utf-8'))
