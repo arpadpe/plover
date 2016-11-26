@@ -88,7 +88,7 @@ class HandleEditor(wx.Dialog):
         self.store = HandleEditorStore(config)
 
         # Grid
-        self.grid = HandleEditorGrid(self, size=wx.Size(800, 600))
+        self.grid = HandleEditorGrid(self, size=wx.Size(525, 400))
         self.grid.CreateGrid(self.store, 0, NUM_COLS)
 
         self.grid.SetRowLabelSize(wx.grid.GRID_AUTOSIZE)
