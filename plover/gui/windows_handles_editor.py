@@ -397,7 +397,8 @@ class AddHandleConfigurationDialog(wx.Dialog):
 
     UI_BORDER = 4
     COMPONENT_SPACE = 3
-    CONFIGURATION_TITLE = "Add window handle"
+    ADD_TITLE = "Add window handle"
+    EDIT_TITLE = "Edit window handle"
     WINDOW_TEXT = "Window:"
     HANDLE_TEXT = "Handle:"
     SEND_TEST_STRING_TEXT = "Send 'test' text"
@@ -418,7 +419,7 @@ class AddHandleConfigurationDialog(wx.Dialog):
         pos = (config.get_config_frame_x(), config.get_config_frame_y())
         size = wx.Size(config.get_config_frame_width(), 
                        config.get_config_frame_height())
-        wx.Dialog.__init__(self, parent, title=self.CONFIGURATION_TITLE, pos=pos, size=size, style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
+        wx.Dialog.__init__(self, parent, title=self.EDIT_TITLE if item else self.ADD_TITLE, pos=pos, size=size, style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
         self.config = config
         self.parent = parent
         self.item = item
