@@ -474,7 +474,7 @@ class AddHandleConfigurationDialog(wx.Dialog):
                             break
                 self.window_handles = outputcontrol.get_window_child_handles(self.windows[windowname]).keys()
             
-        self.handle_combo = wx.ComboBox(self, choices=self.window_handles, style=wx.CB_DROPDOWN|wx.TE_PROCESS_ENTER)
+        self.handle_combo = wx.ComboBox(self, choices=self.window_handles, style=wx.CB_DROPDOWN|wx.CB_READONLY)
         if item:
             self.handle_combo.SetValue(self.item['handle'])
         self.Bind(wx.EVT_COMBOBOX, self._update, self.handle_combo)
