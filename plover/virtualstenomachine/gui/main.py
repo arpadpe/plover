@@ -245,7 +245,7 @@ class InputConfigurationDialog(wx.Dialog):
 	def _update(self, event=None):
 		# Refreshes the UI to reflect current data.
 		input_type = self.machine.get_input_type()
-		if not input_type and self.input_type_choice.GetStringSelection():
+		if (event or not input_type) and self.input_type_choice.GetStringSelection():
 			input_type = self.input_type_choice.GetStringSelection()
 		sizer = self.GetSizer()
 		
@@ -299,7 +299,7 @@ class InputConfigurationDialog(wx.Dialog):
 			box.Add(wx.StaticText(self, label="PORT: "), border=3, flag=wx.ALIGN_RIGHT | wx.ALIGN_CENTER_VERTICAL | wx.RIGHT)
 			self.port_textctrl = wx.TextCtrl(self)
 			if 'port' in self.machine.get_input_params():
-				self.port_textctrl.SetValue(self.machine.get_input_params()['port'])
+				self.port_textctrl.SetValue(str(self.machine.get_input_params()['port']))
 			else:
 				self.port_textctrl.SetValue(str(machinenetwork.DEFAULT_PORT))
 			box.Add(self.port_textctrl)
@@ -461,7 +461,7 @@ class OutputConfigurationDialog(wx.Dialog):
 	def _update(self, event=None):
 		# Refreshes the UI to reflect current data.
 		output_type = self.machine.get_output_type()
-		if not output_type and self.output_type_choice.GetStringSelection():
+		if (event or not output_type) and self.output_type_choice.GetStringSelection():
 			output_type = self.output_type_choice.GetStringSelection()
 		sizer = self.GetSizer()
 		
@@ -511,7 +511,7 @@ class OutputConfigurationDialog(wx.Dialog):
 			box.Add(wx.StaticText(self, label="PORT: "), border=3, flag=wx.ALIGN_RIGHT | wx.ALIGN_CENTER_VERTICAL | wx.RIGHT)
 			self.port_textctrl = wx.TextCtrl(self)
 			if 'port' in self.machine.get_output_params():
-				self.port_textctrl.SetValue(self.machine.get_output_params()['port'])
+				self.port_textctrl.SetValue(str(self.machine.get_output_params()['port']))
 			else:
 				self.port_textctrl.SetValue(str(machinenetwork.DEFAULT_PORT))
 			box.Add(self.port_textctrl)

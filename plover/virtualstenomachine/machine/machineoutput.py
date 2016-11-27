@@ -44,17 +44,14 @@ class MachineOutputSerial(MachineOutputBase):
 		try:
 			self.params = params
 			self.serial_port = None
-			self.serial_params = params['serial_params']
-			self.port_in = params['port1']
-			self.port_out = params['port2']
+			#self.serial_params = params['serial_params']
+			#self.port_in = params['port1']
+			#self.port_out = params['port2']
 			self.machine_type = params['machine_type']
-			self.machine_params = params['machine_params']
+			self.machine_params = params['machine_options']
 			#machineserial.create_serial_port(self.port_in, self.port_out)
 			self.machine = machines[self.machine_type](self.machine_params)
-			print self.machine
 		except Exception, e:
-			#except machineneserial.SerialError as e:
-			#self._error(e.value)
 			print Exception, str(e)
 		
 	def start(self):
@@ -85,7 +82,7 @@ class MachineOutputSerial(MachineOutputBase):
 		}
 	
 	def get_info(self):
-		return "Output: Serial output\n "
+		return "Output: Serial output \nMachine type: {}".format(self.machine_type)
 
 	def __repr__(self):
 		return "MachineOutputSerial(%s)" % (self.params)
