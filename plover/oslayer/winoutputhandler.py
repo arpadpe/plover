@@ -21,6 +21,7 @@ def get_window_class(hwnd):
 	return win32gui.GetClassName(hwnd)
 
 def get_open_windows():
+	windows.clear()
 	win32gui.EnumWindows(enumHandler, [windows, get_window_text])
 	return windows
 

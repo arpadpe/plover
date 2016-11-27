@@ -169,7 +169,21 @@ class HandleEditor(wx.Dialog):
             self.grid.InsertNew(item['window'], item['handle'])
 
     def _delete(self, event=None):
-        self.grid.DeleteSelected()
+        row = self.grid.Selected()
+        window = self.grid.GetValue(row, COL_WINDOW)
+        handle = self.grid.GetValue(row, COL_HANDLE)
+        dlg = wx.MessageDialog(self,
+                               "You will delete %s - %s. Are you sure?" % (window, handle),
+                               "Cancel",
+                               wx.YES_NO | wx.ICON_QUESTION)
+        result = dlg.ShowModal()
+        dlg.Destroy()
+        if result == wx.ID_YES:
+            try:
+                util.SetForegroundWindow(self.last_window)
+            except:
+                pass
+            self.grid.DeleteSelected()
 
     def _save_close(self, event=None):
         self.store.SaveChanges()
@@ -549,16 +563,24 @@ class AddHandleConfigurationDialog(wx.Dialog):
         self.save_button.Enable(self._buttons_enabled())
 
     def _refresh_windows(self, event=None):
-        # TODO: refresh open windows combo box
         self.windows = outputcontrol.get_open_windows()
-        #del self.windows['Focus window']
         self.window_name_box.DeleteWindows()
         self.window_name_box.Add(wx.StaticText(self, label=self.WINDOW_TEXT), border=self.COMPONENT_SPACE, flag=wx.ALIGN_RIGHT | wx.ALIGN_CENTER_VERTICAL | wx.RIGHT)
         self.window_combo = wx.ComboBox(self, choices=self.windows.keys(), style=wx.CB_DROPDOWN|wx.TE_PROCESS_ENTER)
         self.window_name_box.Add(self.window_combo, proportion=1, flag=wx.EXPAND)
+        self.refresh_button = wx.BitmapButton(self, bitmap=self.refresh_bitmap)
+        self.refresh_button.Bind(wx.EVT_BUTTON, lambda e: wx.CallAfter(self._refresh_windows))
         self.window_name_box.Add(self.refresh_button, border=self.UI_BORDER)
         self.Bind(wx.EVT_COMBOBOX, self._update, self.window_combo)
         self.Bind(wx.EVT_TEXT_ENTER, self._update, self.window_combo)
+
+        self.window_handle_box.DeleteWindows()
+        self.window_handle_box.Add(wx.StaticText(self, label=self.HANDLE_TEXT), border=self.COMPONENT_SPACE, flag=wx.ALIGN_RIGHT | wx.ALIGN_CENTER_VERTICAL | wx.RIGHT)
+        self.window_handles = []
+        self.handle_combo = wx.ComboBox(self, choices=self.window_handles, style=wx.CB_DROPDOWN|wx.CB_READONLY)
+        self.Bind(wx.EVT_COMBOBOX, self._update, self.handle_combo)
+        self.Bind(wx.EVT_TEXT_ENTER, self._update, self.handle_combo)
+        self.window_handle_box.Add(self.handle_combo, proportion=1, flag=wx.EXPAND)
         self.GetSizer().Layout()
     
     def _buttons_enabled(self):
