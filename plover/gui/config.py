@@ -726,6 +726,8 @@ class MultipleOutputConfig(ScrolledPanel):
         self.config = config
         self.flows = []
         self.flow_controls = []
+
+        self.platform_available = outputcontrol.platform_available()
         
         self.remove_bitmap = wx.Bitmap(REMOVE_IMAGE_FILE, wx.BITMAP_TYPE_PNG)
         self.edit_bitmap = wx.Bitmap(EDIT_IMAGE_FILE, wx.BITMAP_TYPE_PNG)
@@ -733,6 +735,8 @@ class MultipleOutputConfig(ScrolledPanel):
         main_sizer = wx.BoxSizer(wx.VERTICAL)
         
         button = wx.Button(self, wx.ID_ANY, self.ADD_BUTTON_TEXT)
+        if not self.platform_available:
+            button.Disable()
         main_sizer.Add(button, border=UI_BORDER, flag=wx.ALL)
 
         next_index = lambda : len(self.flows)
@@ -789,16 +793,22 @@ class MultipleOutputConfig(ScrolledPanel):
 
         output_enabled = wx.CheckBox(self)
         output_enabled.SetValue(flow_control['enabled'])
+        if not self.platform_available:
+            output_enabled.Disable()
         sizer.Add(output_enabled, border=UI_BORDER, flag=wx.ALL)
 
         output_enabled.Bind(wx.EVT_CHECKBOX, lambda e: wx.CallAfter(self.update_enabled, flow_control, output_enabled.GetValue()))
 
         edit_button = wx.BitmapButton(self, bitmap=self.edit_bitmap)
         edit_button.Bind(wx.EVT_BUTTON, lambda e: wx.CallAfter(self.show_edit, index))
+        if not self.platform_available:
+            edit_button.Disable()
         sizer.Add(edit_button, border=UI_BORDER)
 
         remove_button = wx.BitmapButton(self, bitmap=self.remove_bitmap)
         remove_button.Bind(wx.EVT_BUTTON, lambda e: wx.CallAfter(self.remove_row, index))
+        if not self.platform_available:
+            remove_button.Disable()
         sizer.Add(remove_button, border=UI_BORDER, flag=wx.LEFT)
 
         windowname = flow_control['window']
