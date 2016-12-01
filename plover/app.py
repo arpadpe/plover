@@ -240,7 +240,6 @@ class StenoEngine(object):
         return self.translator.get_dictionary()
 
     def get_flow_translator_dictionary(self, index):
-        print len(self.flows)
         return self.flows[index].get_translator().get_dictionary()
 
     def get_suggestions(self, translation):
