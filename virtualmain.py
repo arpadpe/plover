@@ -52,7 +52,6 @@ machine.send("A- O- -L")
 machine.send("S- T- K- P- -E -B -S")
 
 machine.stop()
-'''
 
 from plover.virtualstenomachine.machine.txbolt import VirtualStenotype
 
@@ -68,8 +67,8 @@ machine.send("A- O- -L")
 machine.send("S- T- K- P- -E -B -S")
 
 machine.stop()
-
 '''
+
 import os
 import shutil
 import sys
@@ -85,7 +84,7 @@ import json
 import glob
 from plover.virtualstenomachine.gui.main import VirtualMachineGUI
 from plover.oslayer.config import CONFIG_DIR, ASSETS_DIR
-from plover.config import CONFIG_FILE, DEFAULT_DICTIONARY_FILE, Config
+from plover.config import CONFIG_FILE, Config
 
 def show_error(title, message):
 	"""Report error to the user.
@@ -111,13 +110,13 @@ def init_config_dir():
 		os.makedirs(CONFIG_DIR)
 
 	# Copy the default dictionary to the configuration directory.
-	if not os.path.exists(DEFAULT_DICTIONARY_FILE):
+	if not os.path.exists(CONFIG_DIR):
 		unified_dict = {}
 		dict_filenames = glob.glob(os.path.join(ASSETS_DIR, '*.json'))
 		for dict_filename in dict_filenames:
 			unified_dict.update(json.load(open(dict_filename, 'rb')))
 			ordered = OrderedDict(sorted(unified_dict.iteritems(), key=lambda x: x[1]))
-			outfile = open(DEFAULT_DICTIONARY_FILE, 'wb')
+			outfile = open(CONFIG_DIR, 'wb')
 			json.dump(ordered, outfile, indent=0, separators=(',', ': '))
 
 	# Create a default configuration file if one doesn't already
@@ -140,7 +139,7 @@ def main():
 
 if __name__ == '__main__':
     main()
-'''
+
 '''
 from plover.virtualstenomachine.machine.machineinput import MachineInputPhysical as Input
 import plover.virtualstenomachine.machine.machineinput

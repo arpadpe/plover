@@ -7,8 +7,7 @@ if sys.platform.startswith('win32'):
 elif sys.platform.startswith('linux'):
 	import xoutputhandler as outputhandler
 elif sys.platform.startswith('darwin'):
-	# TODO
-	pass
+	import osxoutputhandler as outputhandler
 
 class OutputHandler(outputhandler.OutputHandler):
 	"""Choose output location from config"""

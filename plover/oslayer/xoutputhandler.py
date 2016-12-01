@@ -25,7 +25,11 @@ def get_open_windows():
 
 	return windows
 
-def get_window_child_handles(self, windowname):
+def get_window_child_handles(windowname):
+	# Not needed under linux
+	return dict()
+
+def get_window_child_handles_for_pattern(windowname):
 	# Not needed under linux
 	return dict()
 

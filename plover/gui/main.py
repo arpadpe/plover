@@ -227,8 +227,6 @@ class MainFrame(wx.Frame):
 
         self.steno_engine.add_callback(
             lambda s: wx.CallAfter(self._update_status, s))
-        # TODO: remove output
-        self.steno_engine.set_output( Output(self.consume_command, self.steno_engine))
 
         flows_count = self.config.get_flows_count()
 

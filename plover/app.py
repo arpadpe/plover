@@ -251,18 +251,6 @@ class StenoEngine(object):
         if value != self.is_running:
             log.debug('%s output', 'enabling' if value else 'disabling')
         self.is_running = value
-        '''
-        if self.is_running:
-            self.translator.set_state(self.running_state)
-            self.formatter.set_output(self.full_output)
-        else:
-            self.translator.clear_state()
-            self.formatter.set_output(self.command_only_output)
-        if self.machine is not None:
-            self.machine.set_suppression(self.is_running)
-        for callback in self.subscribers:
-            callback(None)
-        '''
         for flow in self.flows:
             if self.is_running:
                 flow.get_translator().set_state(self.running_state)
@@ -270,8 +258,6 @@ class StenoEngine(object):
             else:
                 flow.get_translator().clear_state()
                 flow.get_formatter().set_output(self.command_only_output)
-#            self.translator.clear_state()
-#            self.formatter.set_output(self.command_only_output)
         if self.machine is not None:
             self.machine.set_suppression(self.is_running)
 
@@ -369,7 +355,6 @@ class Flow(object):
         self.translator = translation.Translator()
         self.translator.add_listener(log.translation)
         self.translator.add_listener(self.formatter.format)
-        #self.translator.set_min_undo_length(10)
         self.full_output = SimpleNamespace()
 
     def get_index(self):
