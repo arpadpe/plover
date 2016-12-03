@@ -45,7 +45,7 @@ class OutputHandler(object):
 			if self.backspace:
 				self.keyboard_control.send_backspaces(number_of_backspaces)
 			else:
-				self.keyboard_control.send_string('*'*number_of_backspaces)
+				self.keyboard_control.send_string('*')
 
 	def send_string(self, s):
 		if self.keyboard_control is not None:
@@ -60,3 +60,4 @@ class OutputHandler(object):
 		if windowname not in self.windows.keys():
 			return False
 		self.keyboard_control = KeyboardEmulation(self.windows[windowname])
+		return True
