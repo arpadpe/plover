@@ -46,7 +46,6 @@ class VirtualStenotypeMachine ():
 		self.output_params = params
 
 	def start(self):
-		print "Start virtualstenomachine"
 		self.input.add_callback(self.forward)
 		self.output.start()
 		self.input.start_input(self.output.stop)

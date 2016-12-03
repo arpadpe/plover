@@ -32,7 +32,6 @@ class MachineInputBase(object):
 	
 	def _notify(self, input):
 		"""Invoke the callback of each subscriber with the given argument."""
-		print "notify", input
 		for callback in self.subscribers:
 			callback(input)
 			

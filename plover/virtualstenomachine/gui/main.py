@@ -6,6 +6,7 @@ from wx.lib.utils import AdjustRectToScreen
 import wx.lib.filebrowsebutton as filebrowse
 import plover.virtualstenomachine.machine.virtualmachine as virtualmachine
 import plover.virtualstenomachine.machine.machinenetwork as machinenetwork
+import plover.virtualstenomachine.machine.machineserial as machineserial
 from plover.virtualstenomachine.machine.virtualmachine import VirtualStenotypeMachine
 from plover.virtualstenomachine.machine.machineinput import InputError
 from plover.machine.registry import machine_registry
@@ -16,9 +17,11 @@ from plover.gui.config import ConfigurationDialog
 
 UI_BORDER = 4
 ERROR_DIALOG_TITLE = "Error"
+ALERT_DIALOG_TITLE = "Alert"
 CONFIG_PANEL_SIZE = (-1, -1)
 SAVE_CONFIG_BUTTON_NAME = "Choose"
 CONFIG_BUTTON_NAME = "Config"
+SERIAL_CONFIG_BUTTON_NAME = "Virtual Serial Config"
 
 class VirtualMachineGUI(wx.App):
 	"""The main entry point for the virtual steno machine application."""
@@ -478,6 +481,12 @@ class OutputConfigurationDialog(wx.Dialog):
 		
 		if output_type == virtualmachine.MACHINE_OUTPUT_SERIAL:
 			self.output_type_choice.SetStringSelection(output_type)
+			if machineserial.virtual_serial_ports_available():
+				box = wx.BoxSizer(wx.HORIZONTAL)
+				serial_config_button = wx.Button(self, label=SERIAL_CONFIG_BUTTON_NAME)
+				self.Bind(wx.EVT_BUTTON, self._virtual_serial_config, serial_config_button)
+				box.Add(serial_config_button)
+				sizer.Add(box, border=UI_BORDER, flag=wx.ALL | wx.EXPAND)
 			box = wx.BoxSizer(wx.HORIZONTAL)
 			machines = self.machine.get_serial_output_types()
 			self.machine_choice = wx.Choice(self, choices=machines)
@@ -535,9 +544,9 @@ class OutputConfigurationDialog(wx.Dialog):
 				self.EndModal(wx.ID_SAVE)
 			else:
 				self.Close()
-			#except TypeError as e:
-			#	self._show_error_alert("Machine not configured")
 		except InputError as e:
+			self._show_error_alert(e.value)
+		except Exception as e:
 			self._show_error_alert(e.value)
 			
 	def _network_output(self, event=None):
@@ -571,7 +580,11 @@ class OutputConfigurationDialog(wx.Dialog):
 		else:
 			kbd = KeyboardConfigDialog(config_instance, self, self.config)
 			kbd.ShowModal()
-			kbd.Destroy()
+		self.machine_params = config_instance.__dict__
+
+	def _virtual_serial_config(self, event=None):
+		vscd = VirtualSerialConfigDialog(self)
+		vscd.ShowModal()
 
 	def on_close(self, event):
 		self.other_instances.remove(self)
@@ -582,3 +595,59 @@ class OutputConfigurationDialog(wx.Dialog):
 		alert_dialog = wx.MessageDialog(self, message, ERROR_DIALOG_TITLE, wx.OK | wx.ICON_ERROR)
 		alert_dialog.ShowModal()
 		alert_dialog.Destroy()
+
+	def _show_alert(self, message):
+		alert_dialog = wx.MessageDialog(self, message, ALERT_DIALOG_TITLE, wx.OK)
+		alert_dialog.ShowModal()
+		alert_dialog.Destroy()
+
+class VirtualSerialConfigDialog(wx.Dialog):
+
+	CONFIGURATION_TITLE = 'Virtual Serial Configuration'
+	CREATE_BUTTON_NAME = 'Create'
+
+	def __init__(self, parent):
+
+		self.parent = parent
+
+		pos = (400, 400)
+		wx.Dialog.__init__(self, parent, title=self.CONFIGURATION_TITLE, pos=pos, style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
+
+		ports = machineserial.get_default_ports()
+
+		sizer = wx.BoxSizer(wx.VERTICAL)
+
+		box = wx.BoxSizer(wx.HORIZONTAL)
+
+		box.Add(wx.StaticText(self, label="Port 1: "), border=3, flag=wx.ALIGN_RIGHT | wx.ALIGN_CENTER_VERTICAL | wx.RIGHT)
+		self.port1_textctrl = wx.TextCtrl(self)
+		if len(ports) > 0 and ports[0]:
+			self.port1_textctrl.SetValue(str(ports[0]))
+		box.Add(self.port1_textctrl)
+		sizer.Add(box, border=UI_BORDER, flag=wx.ALL | wx.EXPAND)
+		
+		box = wx.BoxSizer(wx.HORIZONTAL)
+		box.Add(wx.StaticText(self, label="Port 2: "), border=3, flag=wx.ALIGN_RIGHT | wx.ALIGN_CENTER_VERTICAL | wx.RIGHT)
+		self.port2_textctrl = wx.TextCtrl(self)
+		if len(ports) > 0 and ports[1]:
+			self.port2_textctrl.SetValue(str(ports[1]))
+		box.Add(self.port2_textctrl)
+		sizer.Add(box, border=UI_BORDER, flag=wx.ALL | wx.EXPAND)		
+		
+		button = wx.Button(self, label=self.CREATE_BUTTON_NAME) 
+		self.Bind(wx.EVT_BUTTON, self._create_virtual_serial_ports, button)
+		sizer.Add(button, flag=wx.ALIGN_RIGHT)
+
+		self.SetSizer(sizer)
+		self.SetAutoLayout(True)
+		sizer.Layout()
+
+		self.SetRect(AdjustRectToScreen(self.GetRect()))
+
+	def _create_virtual_serial_ports(self, event=None):
+		if self.port1_textctrl.GetValue() and self.port2_textctrl.GetValue():
+			try:
+				machineserial.create_serial_port(self.port1_textctrl.GetValue(), self.port2_textctrl.GetValue())
+				self.parent._show_alert("Virtual serial ports created")
+			except Exception as e:
+				self.parent._show_error_alert(e.value)

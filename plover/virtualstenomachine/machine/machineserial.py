@@ -25,6 +25,14 @@ def create_serial_port(port1, port2):
 		# TODO
 		pass
 		
+def virtual_serial_ports_available():
+	if sys.platform.startswith('win32'):
+		return False
+	elif sys.platform.startswith('linux'):
+		return True
+	elif sys.platform.startswith('darwin'):
+		return False
+
 def close_serial_port():		
 	if sys.platform.startswith('linux'):	
 		if socat_port:
@@ -37,7 +45,7 @@ def get_default_ports():
 	if sys.platform.startswith('win32'):
 		return ['COM1','COM2']
 	elif sys.platform.startswith('linux'):
-		return ['/tmp/port1','/tmp/port2']
+		return ['/tmp/ttyV1','/tmp/ttyV2']
 	elif sys.platform.startswith('darwin'):
 		# TODO
 		pass
