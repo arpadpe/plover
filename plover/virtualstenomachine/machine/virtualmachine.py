@@ -53,6 +53,7 @@ class VirtualStenotypeMachine ():
 	def stop(self):
 		if self.input:
 			self.input.stop_input()
+			self.input.remove_callback(self.forward)
 		if self.output:
 			self.output.stop()
 		

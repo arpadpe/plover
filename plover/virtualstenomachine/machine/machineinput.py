@@ -19,8 +19,8 @@ class MachineInputBase(object):
 
 	def remove_callback(self, callback):
 		"""Unsubscribe from input"""
-		
-		self.subscribers.remove(callback)
+		if callback in self.subscribers:
+			self.subscribers.remove(callback)
 
 	def start_input(self, done):
 		"""Begin listening for input."""
@@ -52,13 +52,13 @@ class MachineInputFile(MachineInputBase):
 			self._error("File not found")
 		self.filename = filename
 		self.delimiter = delimiter if delimiter is not None else '\n'
-		try:
-			MachineInputBase.__init__(self)
-			self.file = open(filename, 'r')
-		except IOError as e:
-			self._error("File could not be opened")			
+		MachineInputBase.__init__(self)	
 		
 	def start_input(self, done):
+		try:
+			self.file = open(self.filename, 'r')
+		except IOError as e:
+			self._error("File could not be opened")	
 		for line in self.file:
 			for input in line.strip().split(self.delimiter):
 				if input:

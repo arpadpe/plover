@@ -131,7 +131,6 @@ class MainFrame(wx.Frame):
 
 		if (input_info_text != self.INPUT_TEXT_DEFAULT) and (output_info_text != self.OUTPUT_TEXT_DEFAULT):
 			self.start_button.Enable()
-			self.stop_button.Enable()
 		else:
 			self.start_button.Disable()
 			self.stop_button.Disable()
@@ -144,6 +143,8 @@ class MainFrame(wx.Frame):
 
 		try:
 			self.machine.start()
+			self.start_button.Disable()
+			self.stop_button.Enable()
 		except Exception as e:
 			self._show_alert(unicode(e))
 			self._quit()
@@ -166,7 +167,8 @@ class MainFrame(wx.Frame):
 		"""Called when the stop button is clicked."""
 		if self.machine:
 			self.machine.stop()
-		pass
+			self.start_button.Enable()
+			self.stop_button.Disable()
 		
 	def _show_input_configuration(self, event=None):
 		dlg = InputConfigurationDialog(self.machine, self.config, parent=self)
