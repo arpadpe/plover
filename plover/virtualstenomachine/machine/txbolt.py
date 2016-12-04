@@ -30,7 +30,6 @@ STENO_KEY_CHART = ("S-", "T-", "K-", "P-", "W-", "H-",  # 00
                    "-F", "-R", "-P", "-B", "-L", "-G",  # 10
                    "-T", "-S", "-D", "-Z", "#")         # 11
 
-
 class VirtualStenotypeTxBolt(VirtualStenotypeBase):
 	"""TX Bolt interface.
 
@@ -43,20 +42,44 @@ class VirtualStenotypeTxBolt(VirtualStenotypeBase):
 
 	"""
 	def send(self, key_stroke):
+		self.key_sets = [0,0,0,0]
 		keys = key_stroke.split(' ')
-		key_sets = [0,0,0,0]
 		for key in keys:
-			index = STENO_KEY_CHART.index(key)
-			key_set, key_index = divmod(index, 6)
-			key_code = (key_set << 6) | (1 << key_index)
-			key_sets[key_set] |= key_code
+			
+			if self._add_to_key_sets(key):
+				continue
+
+			char_index = -1
+			for char in key:
+				char_index += 1
+				if char in STENO_KEY_CHART:
+					self._add_to_key_sets(char)
+				elif char_index < len(key) / 2:
+					if self._add_to_key_sets(char + '-'):
+						continue
+					elif self._add_to_key_sets('-' + char):
+						continue
+				else:
+					if self._add_to_key_sets('-' + char):
+						continue
+					elif self._add_to_key_sets(char + '-'):
+						continue
 		
-		for key_set in key_sets:
+		for key_set in self.key_sets:
 			if key_set > 0:
 				self.serial_port.write(chr(key_set))
 		self.serial_port.write(chr(0))
 		
-		del key_sets[:]
+		del self.key_sets[:]
+
+	def _add_to_key_sets(self, key):
+		if key not in STENO_KEY_CHART:
+			return False
+		index = STENO_KEY_CHART.index(key)
+		key_set, key_index = divmod(index, 6)
+		key_code = (key_set << 6) | (1 << key_index)
+		self.key_sets[key_set] |= key_code
+		return True
 
 	def __repr__(self):
 		return "VirtualStenotypeTxBolt(%s)" % self.serial_params

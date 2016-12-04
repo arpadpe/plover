@@ -5,6 +5,7 @@ import threading
 from plover.machine.registry import machine_registry, NoSuchMachineException
 from plover.virtualstenomachine.machine.machinenetwork import StenoMachineServer
 from plover import system
+import time
 
 class MachineInputBase(object):
 	"""The base class for stenotype machine input"""
@@ -55,14 +56,17 @@ class MachineInputFile(MachineInputBase):
 		MachineInputBase.__init__(self)	
 		
 	def start_input(self, done):
+		time.sleep(5)
 		try:
 			self.file = open(self.filename, 'r')
 		except IOError as e:
 			self._error("File could not be opened")	
 		for line in self.file:
-			for input in line.strip().split(self.delimiter):
-				if input:
-					self._notify(input)
+			for outline in line.strip().split(self.delimiter):
+				if outline:
+					for input in outline.strip().split('/'):
+						if input:
+							self._notify(input)
 		done()
 					
 	def stop_input(self):

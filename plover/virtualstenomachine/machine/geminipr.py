@@ -34,20 +34,44 @@ class VirtualStenotypeGeminiPr(VirtualStenotypeBase):
 	def send(self, key_stroke):
 		"""Overrides base class run method. Do not call directly."""
 
+		self.key_sets = [ 0x80, 0, 0, 0, 0, 0]
 		keys = key_stroke.split(' ')
-		key_sets = [ 0x80, 0, 0, 0, 0, 0]
 		for key in keys:
-			index = STENO_KEY_CHART.index(key)
-			key_set, key_index = divmod(index, 7)
-			key_code = 1 << 6 - key_index
-			key_sets[key_set] |= key_code
 
-		packet = chr(key_sets[0])
+			if self._add_to_key_sets(key):
+				continue
+
+			char_index = -1
+			for char in key:
+				char_index += 1
+				if char in STENO_KEY_CHART:
+					self._add_to_key_sets(char)
+				elif char_index < len(key) / 2:
+					if self._add_to_key_sets(char + '-'):
+						continue
+					elif self._add_to_key_sets('-' + char):
+						continue
+				else:
+					if self._add_to_key_sets('-' + char):
+						continue
+					elif self._add_to_key_sets(char + '-'):
+						continue
+
+		packet = chr(self.key_sets[0])
 		for i in range(1,6):
-			packet += chr(key_sets[i])
+			packet += chr(self.key_sets[i])
 		self.serial_port.write(packet)
 		
-		del key_sets[:]
+		del self.key_sets[:]
+
+	def _add_to_key_sets(self, key):
+		if key not in STENO_KEY_CHART:
+			return False
+		index = STENO_KEY_CHART.index(key)
+		key_set, key_index = divmod(index, 7)
+		key_code = 1 << 6 - key_index
+		self.key_sets[key_set] |= key_code
+		return True
 
 	def __repr__(self):
 		return "VirtualStenotypeGeminiPr(%s)" % self.params

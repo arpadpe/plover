@@ -1,7 +1,7 @@
 # Copyright (c) 2013 Hesky Fisher
 # See LICENSE.txt for details.
 
-"Thread-based monitoring of a stenotype machine using the passport protocol."
+"Thread-Based monitoring of a stenotype machine using the passport protocol."
 
 import time
 import plover.machine.passport as passport
@@ -11,16 +11,13 @@ from plover.virtualstenomachine.machine.base import VirtualStenotypeBase
 # http://www.eclipsecat.com/?q=system/files/Passport%20protocol_0.pdf
 
 STENO_KEY_CHART = {
-    '#': '#',
-    'S-': 'S',
-    'S-':'C',
+    'S-':'S',
     'T-':'T',
     'K-':'K',
     'P-':'P',
     'W-':'W',
     'H-':'H',
     'R-':'R',
-    '*':'*',
     'A-':'A',
     'O-':'O',
     '-E':'E',
@@ -37,6 +34,10 @@ STENO_KEY_CHART = {
     '-Z':'Z'
 }
 
+DEFAULTS = ['#', '*']
+
+SHADOW = 'f'
+
 #STENO_KEY_CHART = {value : key for key, value in passport.STENO_KEY_CHART.items() if value}
 
 class VirtualStenotypePassport(VirtualStenotypeBase):
@@ -49,24 +50,55 @@ class VirtualStenotypePassport(VirtualStenotypeBase):
 		self.params = params
 
 	def send(self, key_stroke):
-		keys = key_stroke.split(' ')
 		current_time = int(time.time())
 		packet = ['<', str(self.stroke_number), '/']
+		keys = key_stroke.split(' ')
 		for key in keys:
-			try:
-				stroke = STENO_KEY_CHART[key]
-			except:
-				stroke = key
-			packet.append(stroke)
-			packet.append('f')
+			if self.get_stroke(key):
+				packet.append(self.get_stroke(key))
+				packet.append(SHADOW)
+			else:
+				index = 0
+				for char in key:
+					if char in DEFAULTS:
+						packet.append(char)
+						packet.append(SHADOW)
+					elif index < len(key) / 2:
+						if self.get_stroke(char + '-'):
+							packet.append(self.get_stroke(char + '-'))
+							packet.append(SHADOW)
+						elif self.get_stroke('-' + char):
+							packet.append(self.get_stroke('-' + char))
+							packet.append(SHADOW)
+						elif char != '/' and char in STENO_KEY_CHART.values():
+							packet.append(char)
+							packet.append(SHADOW)
+					else:
+						if self.get_stroke('-' + char):
+							packet.append(self.get_stroke('-' + char))
+							packet.append(SHADOW)
+						elif self.get_stroke(char + '-'):
+							packet.append(self.get_stroke(char + '-'))
+							packet.append(SHADOW)
+						elif char != '/' and char in STENO_KEY_CHART.values():
+							packet.append(char)
+							packet.append(SHADOW)
+					index += 1
+
 		packet.append('/')
 		packet.append(str(self.start_time - current_time))
 		packet.append('>')
 		raw = ''.join(packet)
-		self.serial_port.write(raw)
+		self.serial_port.write(raw.encode('utf8'))
 		self.serial_port.flush()
 		del packet[:]
 		self.stroke_number += 1
+
+	def get_stroke(self, key):
+		if key in STENO_KEY_CHART.keys():
+			return STENO_KEY_CHART[key]
+		else:
+			return None
 
 	@staticmethod
 	def get_option_info():
