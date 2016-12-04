@@ -149,12 +149,18 @@ Unknown.
 import array
 import itertools
 import struct
+import time
+import threading
 
 from plover.virtualstenomachine.machine.base import VirtualStenotypeBase
 
 
 class _ProtocolViolationException(Exception):
     """Something has happened that is doesn't follow the protocol."""
+    pass
+
+class _StopException(Exception):
+    """The thread was asked to stop."""
     pass
 
 _CRC_TABLE = [
@@ -472,6 +478,21 @@ def _write_to_port(port, data):
     while data:
         data = buffer(data, port.write(data))
 
+def _await_connection(port, stop, timeout = .900):
+
+    request_buffer, response_buffer = array.array('B'), array.array('B')
+
+    while True:
+        if not port.isOpen():
+            break
+        packet = _read_packet(port, request_buffer)
+        response = _make_response(response_buffer, _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0], ord(packet[1]))
+        _write_to_port(port, response)
+
+        stop.wait(timeout)
+
+
+
 
 class VirtualStenotypeStentura(VirtualStenotypeBase):
     """Stentura interface.
@@ -484,44 +505,81 @@ class VirtualStenotypeStentura(VirtualStenotypeBase):
     def __init__(self, params):
         VirtualStenotypeBase.__init__(self, params)
         self.params = params
+
+    def start(self):
+        """Override base class start method. Do not call directly."""
+        VirtualStenotypeBase.start(self)
+
+        try:
+            self.stopthread = threading.Event()
+            t = threading.Thread(target=_await_connection, args=(self.serial_port, self.stopthread))
+            t.start()
+        except _StopException:
+            pass
+        except Exception, e:
+            self._error(e)
 		
 
     def send(self, key_stroke):
-		keys = key_stroke.split(' ')
-		key_sets = [ 0xc0, 0xc0, 0xc0, 0xc0]
-		for key in keys:
-			index = _STENO_KEY_CHART.index(key)
-			key_set, key_index = divmod(index, 6)
-			key_code = 1 << 5 - key_index
-			key_sets[key_set] |= key_code
-		
-		port = self.serial_port
-		request_buffer, response_buffer, data_buffer = array.array('B'), array.array('B'), array.array('B')
-		
-		packet = _read_packet(port, request_buffer)
-		if _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0] == _OPEN:
-			response = _make_response(response_buffer, _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0], ord(packet[1]),)
-			_write_to_port(port, response)
-			packet = _read_packet(port, request_buffer)
-			response = _make_response(response_buffer, _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0], ord(packet[1]))
-			_write_to_port(port, response)
-			packet = _read_packet(port, request_buffer)
-			data_buffer = array.array('B')
-			_write_to_buffer(data_buffer, 0, key_sets)
-			response = _make_response(response_buffer, _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0], ord(packet[1]), p1=len(data_buffer), data=data_buffer)
-			_write_to_port(port, response)
-		elif _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0] == _READC:
-			data_buffer = array.array('B')
-			_write_to_buffer(data_buffer, 0, key_sets)
-			response = _make_response(response_buffer, _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0], ord(packet[1]), p1=len(data_buffer), data=data_buffer)
-			_write_to_port(port, response)
-		else:
-			return
-			
-		# Send a packet with p1=0 to signal end of strokes
-		packet = _read_packet(port, request_buffer)
-		response = _make_response(response_buffer, _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0], ord(packet[1]))
-		_write_to_port(port, response)
+        self.key_sets = [ 0xc0, 0xc0, 0xc0, 0xc0]
+        keys = key_stroke.split(' ')
+        for key in keys:
+
+            if self._add_to_key_sets(key):
+                continue
+
+            char_index = -1
+            for char in key:
+                char_index += 1
+                if char in _STENO_KEY_CHART:
+                    self._add_to_key_sets(char)
+                elif char_index < len(key) / 2:
+                    if self._add_to_key_sets(char + '-'):
+                        continue
+                    elif self._add_to_key_sets('-' + char):
+                        continue
+                else:
+                    if self._add_to_key_sets('-' + char):
+                        continue
+                    elif self._add_to_key_sets(char + '-'):
+                        continue
+
+        port = self.serial_port
+        request_buffer, response_buffer, data_buffer = array.array('B'), array.array('B'), array.array('B')
+
+        packet = _read_packet(port, request_buffer)
+        if _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0] == _OPEN:
+        	response = _make_response(response_buffer, _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0], ord(packet[1]),)
+        	_write_to_port(port, response)
+        	packet = _read_packet(port, request_buffer)
+        	response = _make_response(response_buffer, _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0], ord(packet[1]))
+        	_write_to_port(port, response)
+        	packet = _read_packet(port, request_buffer)
+        	data_buffer = array.array('B')
+        	_write_to_buffer(data_buffer, 0, self.key_sets)
+        	response = _make_response(response_buffer, _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0], ord(packet[1]), p1=len(data_buffer), data=data_buffer)
+        	_write_to_port(port, response)
+        elif _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0] == _READC:
+        	data_buffer = array.array('B')
+        	_write_to_buffer(data_buffer, 0, self.key_sets)
+        	response = _make_response(response_buffer, _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0], ord(packet[1]), p1=len(data_buffer), data=data_buffer)
+        	_write_to_port(port, response)
+        else:
+        	return
+        	
+        # Send a packet with p1=0 to signal end of strokes
+        packet = _read_packet(port, request_buffer)
+        response = _make_response(response_buffer, _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0], ord(packet[1]))
+        _write_to_port(port, response)
+
+    def _add_to_key_sets(self, key):
+        if key not in _STENO_KEY_CHART:
+            return False
+        index = _STENO_KEY_CHART.index(key)
+        key_set, key_index = divmod(index, 6)
+        key_code = 1 << 5 - key_index
+        self.key_sets[key_set] |= key_code
+        return True
 
     def __repr__(self):
         return "VirtualStenotypeStentura(%s)" % self.params

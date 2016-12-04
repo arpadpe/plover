@@ -54,6 +54,7 @@ class MachineOutputSerial(MachineOutputBase):
 		self.machine.start()
 
 	def stop(self):
+		self.machine.stop()
 		if self.serial_port:
 			self.serial_port.close()
 			machineneserial.close_serial_port()
