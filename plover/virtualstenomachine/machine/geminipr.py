@@ -1,6 +1,4 @@
 
-"""Thread-based monitoring of a Gemini PR stenotype machine."""
-
 import plover.machine.geminipr as geminipr
 from plover.virtualstenomachine.machine.base import VirtualStenotypeBase
 
@@ -25,9 +23,7 @@ BYTES_PER_STROKE = 6
 class VirtualStenotypeGeminiPr(VirtualStenotypeBase):
 	"""Standard stenotype interface for a Gemini PR machine.
 
-	This class implements the three methods necessary for a standard
-	stenotype interface: start_capture, stop_capture, and
-	add_callback.
+	This class implements the send method.
 
 	"""
 
@@ -74,5 +70,5 @@ class VirtualStenotypeGeminiPr(VirtualStenotypeBase):
 		return True
 
 	def __repr__(self):
-		return "VirtualStenotypeGeminiPr(%s)" % self.params
+		return "VirtualStenotypeGeminiPr(%s)" % self.serial_params
 			

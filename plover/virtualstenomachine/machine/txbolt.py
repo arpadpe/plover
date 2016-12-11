@@ -1,7 +1,3 @@
-# Copyright (c) 2011 Hesky Fisher
-# See LICENSE.txt for details.
-
-"Thread-based monitoring of a stenotype machine using the TX Bolt protocol."
 
 import plover.machine.txbolt as txbolt
 from plover.virtualstenomachine.machine.base import VirtualStenotypeBase
@@ -33,12 +29,7 @@ STENO_KEY_CHART = ("S-", "T-", "K-", "P-", "W-", "H-",  # 00
 class VirtualStenotypeTxBolt(VirtualStenotypeBase):
 	"""TX Bolt interface.
 
-	This class implements the send method
-
-
-	 necessary for a standard
-	stenotype interface: start_capture, stop_capture, and
-	add_callback.
+	This class implements the send method.
 
 	"""
 	def send(self, key_stroke):

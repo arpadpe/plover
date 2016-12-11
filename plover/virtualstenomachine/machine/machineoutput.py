@@ -33,7 +33,7 @@ class MachineOutputBase(object):
 
 class MachineOutputSerial(MachineOutputBase):
 
-	def __init__(self, params):
+	def __init__(self, machine_type, machine_options):
 		"""Monitor the stenotype over a serial port.
 
 		Keyword arguments are the same as the keyword arguments for a
@@ -42,22 +42,22 @@ class MachineOutputSerial(MachineOutputBase):
 		"""
 		
 		try:
-			self.params = params
-			self.serial_port = None
-			self.machine_type = params['machine_type']
-			self.machine_params = params['machine_options']
+			self.machine_type = machine_type
+			self.machine_params = machine_options
 			self.machine = machines[self.machine_type](self.machine_params)
 		except Exception, e:
-			print Exception, str(e)
+			self._error(e)
 		
 	def start(self):
+		print self.machine
 		self.machine.start()
 
 	def stop(self):
-		self.machine.stop()
-		if self.serial_port:
-			self.serial_port.close()
-			machineneserial.close_serial_port()
+		try:
+			self.machine.stop()
+		except Exception:
+			# thrown if machine is not configured
+			pass
 		
 	def send(self, msg):
 		self.machine.send(msg)
@@ -79,7 +79,7 @@ class MachineOutputSerial(MachineOutputBase):
 		}
 	
 	def get_info(self):
-		return "Output: Serial output \nMachine type: {}".format(self.machine_type)
+		return "Output: Serial output \nMachine type: %s\nSerial Port: %s" % (self.machine_type, self.machine_params['port'])
 
 	def __repr__(self):
 		return "MachineOutputSerial(%s)" % (self.params)
@@ -98,7 +98,11 @@ class MachineOutputNetwork(MachineOutputBase):
 			self._error("Could not connect to %s:%s\n%s" % (self.HOST, self.PORT, e))
 		
 	def stop(self):
-		self.client.stop()
+		try:
+			self.client.stop()
+		except Exception:
+			# thrown if client is not configured
+			pass
 		
 	def send(self, msg):
 		self.client.send(msg + '\n')

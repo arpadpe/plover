@@ -16,8 +16,8 @@ MACHINE_INPUT_PHYSICAL = "Physcal machine input"
 MACHINE_OUTPUT_SERIAL = "Serial output"
 MACHINE_OUTPUT_NETWORK = "Network output"
 
-class VirtualStenotypeMachine ():
-	"""The base class for stenotype machine input"""
+class VirtualStenotypeMachine(object):
+	"""The main class for virtual stenotype machine"""
 
 	def __init__(self):
 		self.input = MachineInputBase()
@@ -39,7 +39,7 @@ class VirtualStenotypeMachine ():
 			
 	def set_output_type(self, output_type, params):
 		if output_type == MACHINE_OUTPUT_SERIAL:
-			self.output = MachineOutputSerial(params)
+			self.output = MachineOutputSerial(params['machine_type'], params['machine_options'])
 		elif output_type == MACHINE_OUTPUT_NETWORK:
 			self.output = MachineOutputNetwork(params['host'], params['port'])
 		self.output_type = output_type
@@ -48,7 +48,7 @@ class VirtualStenotypeMachine ():
 	def start(self):
 		self.input.add_callback(self.forward)
 		self.output.start()
-		self.input.start_input(self.output.stop)
+		self.input.start_input()
 		
 	def stop(self):
 		if self.input:

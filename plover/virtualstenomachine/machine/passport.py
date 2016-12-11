@@ -38,10 +38,11 @@ DEFAULTS = ['#', '*']
 
 SHADOW = 'f'
 
-#STENO_KEY_CHART = {value : key for key, value in passport.STENO_KEY_CHART.items() if value}
-
 class VirtualStenotypePassport(VirtualStenotypeBase):
-	"""Passport interface."""
+	"""Passport interface.
+
+	This class implements the send method.
+	"""
 
 	def __init__(self, *params):
 		VirtualStenotypeBase.__init__(self, *params)
@@ -86,7 +87,7 @@ class VirtualStenotypePassport(VirtualStenotypeBase):
 					index += 1
 
 		packet.append('/')
-		packet.append(str(self.start_time - current_time))
+		packet.append(str(abs(self.start_time - current_time)))
 		packet.append('>')
 		raw = ''.join(packet)
 		self.serial_port.write(raw.encode('utf8'))

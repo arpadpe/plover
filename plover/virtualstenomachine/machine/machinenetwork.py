@@ -1,4 +1,4 @@
-import SocketServer
+
 import socket
 import threading
 
@@ -10,17 +10,17 @@ class StenoMachineServer(object):
 	def __init__(self, HOST, PORT, callback):
 		self.HOST = HOST
 		self.PORT = PORT
-		self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		self.socket.bind((self.HOST, self.PORT))
 		self.callback = callback
 		
 	def start(self):
+		self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		self.socket.bind((self.HOST, self.PORT))
 		self.server_thread = threading.Thread(target=self.handle)
 		self.server_thread.daemon = True
 		self.server_thread.start()
 	
 	def handle(self):
-		self.socket.listen(1)
+		self.socket.listen(0)
 
 		while True:
 			self.connection, self.client_address = self.socket.accept()

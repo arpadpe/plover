@@ -131,6 +131,8 @@ class MainFrame(wx.Frame):
 
 		if (input_info_text != self.INPUT_TEXT_DEFAULT) and (output_info_text != self.OUTPUT_TEXT_DEFAULT):
 			self.start_button.Enable()
+			self.input_cfg_button.Enable()
+			self.output_cfg_button.Enable()
 		else:
 			self.start_button.Disable()
 			self.stop_button.Disable()
@@ -144,6 +146,8 @@ class MainFrame(wx.Frame):
 		try:
 			self.machine.start()
 			self.start_button.Disable()
+			self.input_cfg_button.Disable()
+			self.output_cfg_button.Disable()
 			self.stop_button.Enable()
 		except Exception as e:
 			self._show_alert(unicode(e))
@@ -168,6 +172,8 @@ class MainFrame(wx.Frame):
 		if self.machine:
 			self.machine.stop()
 			self.start_button.Enable()
+			self.input_cfg_button.Enable()
+			self.output_cfg_button.Enable()
 			self.stop_button.Disable()
 		
 	def _show_input_configuration(self, event=None):
@@ -243,7 +249,11 @@ class InputConfigurationDialog(wx.Dialog):
 		self.Bind(wx.EVT_CLOSE, self.on_close)
 
 	def on_close(self, event):
-		self.other_instances.remove(self)
+		try:
+			self.other_instances.remove(self)
+		except Exception:
+			# thrown when no other instances
+			pass
 		self.parent._update()
 		event.Skip()	
 
@@ -396,6 +406,7 @@ class InputConfigurationDialog(wx.Dialog):
 			kbd = KeyboardConfigDialog(config_instance, self, self.config)
 			kbd.ShowModal()
 			kbd.Destroy()
+		self.machine_params = config_instance.__dict__
 		
 	def _show_error_alert(self, message):
 		alert_dialog = wx.MessageDialog(self, message, ERROR_DIALOG_TITLE, wx.OK | wx.ICON_ERROR)
@@ -546,10 +557,8 @@ class OutputConfigurationDialog(wx.Dialog):
 				self.EndModal(wx.ID_SAVE)
 			else:
 				self.Close()
-		except InputError as e:
-			self._show_error_alert(e.value)
-		except Exception as e:
-			self._show_error_alert(e.value)
+		except Exception, e:
+			self._show_error_alert(e)
 			
 	def _network_output(self, event=None):
 		try:

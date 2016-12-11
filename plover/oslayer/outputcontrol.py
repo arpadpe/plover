@@ -42,6 +42,7 @@ def get_handle_needed():
 		return False
 	elif sys.platform.startswith('darwin'):
 		return False
+	return False
 
 def platform_available():
 	if sys.platform.startswith('win32'):
@@ -50,4 +51,5 @@ def platform_available():
 		return True
 	elif sys.platform.startswith('darwin'):
 		return False
+	return False
 	

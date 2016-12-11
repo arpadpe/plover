@@ -5,8 +5,7 @@ import win32gui
 import win32api
 import win32con
 import pywintypes
-from winkeyboardcontrol import KeyboardEmulation
-import win_window_handler_loader as loader
+import win_window_handle_loader as loader
 
 WINDOWS_DEFAULTS = ["Start", "Clock", "CPU Meter", "Program Manager"]
 PLOVER_DEFAULTS = ["Plover: running", "Plover: stopped", "Plover: error", "Plover", "plover", "Plover Configuration"]
@@ -32,7 +31,7 @@ def get_window_child_handles(hwnd):
 	try:
 		handles[get_window_class(hwnd)] = hwnd
 		win32gui.EnumChildWindows(hwnd, enumHandler, [handles, get_window_class])
-	except pywintypes.error:
+	except Exception:
 		# Thrown if no child windows present
 		pass
 	return handles
@@ -118,8 +117,11 @@ class OutputHandler(object):
 	def send_backspaces(self, number_of_backspaces):
 		if self.destinationHwnd < 0:
 			return
-		for _ in xrange(number_of_backspaces):
-			win32api.PostMessage(self.destinationHwnd, win32con.WM_CHAR, ord('\b') if self.backspace else ord('*'), 0)
+		if self.backspace:
+			for _ in xrange(number_of_backspaces):
+				win32api.PostMessage(self.destinationHwnd, win32con.WM_CHAR, ord('\b'), 0)
+		else:
+			win32api.PostMessage(self.destinationHwnd, win32con.WM_CHAR, ord('*'), 0)
 
 	def send_string(self, s):
 		if self.destinationHwnd < 0:
@@ -135,7 +137,6 @@ class OutputHandler(object):
 		window_handles = get_all_handles()
 
 		if window not in window_handles.keys():
-			#  TODO: raise???
 			return False
 
 		for key, value in self.window_handles_regex.items():
@@ -153,5 +154,4 @@ class OutputHandler(object):
 					self.destinationHwnd = hwnd
 					return False
 
-		# TODO: if no handler found raise???
 		return False

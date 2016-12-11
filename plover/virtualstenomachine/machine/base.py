@@ -16,7 +16,7 @@ class VirtualStenotypeError(Exception):
 
 class VirtualStenotypeBase(object):
 	
-	def __init__(self, *serial_params):
+	def __init__(self, serial_params):
 		self.serial_port = None
 		self.serial_params = serial_params
 		
@@ -24,8 +24,9 @@ class VirtualStenotypeBase(object):
 		if self.serial_port:
 			self.serial_port.close()
 			
+		print self.serial_params
 		try:
-			self.serial_port = serial.Serial(*self.serial_params)
+			self.serial_port = serial.Serial(**self.serial_params)
 		except (serial.SerialException, OSError, TypeError) as e:
 			self._error("Could not start serial port")
 			return
@@ -36,7 +37,7 @@ class VirtualStenotypeBase(object):
 		if self.serial_port:
 			self.serial_port.close()
 			
-	def send(steno_key):
+	def send(self, steno_key):
 		pass
 
 	def _error(self, msg):

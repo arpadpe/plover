@@ -268,7 +268,7 @@ class MainFrame(wx.Frame):
             if config.get_output_window(i) == config.DEFAULT_OUTPUT_WINDOW:
                 output = Output(self.consume_command, engine)
             else:
-                output = SecondaryOutput(self.consume_command, 
+                output = WindowOutput(self.consume_command, 
                                          engine, 
                                          config.get_output_send_backspaces(i), 
                                          self.windows_handles_filename)
@@ -425,7 +425,7 @@ class Output(object):
             if result and not self.engine.is_running:
                 self.engine.machine.suppress_last_stroke(self.send_backspaces)
 
-class SecondaryOutput(object):
+class WindowOutput(object):
     def __init__(self, engine_command_callback, engine, backspace = True, filename = None):
         self.engine_command_callback = engine_command_callback
         self.output_control = OutputHandler(backspace, filename)

@@ -478,7 +478,7 @@ def _write_to_port(port, data):
     while data:
         data = buffer(data, port.write(data))
 
-def _await_connection(port, stop, timeout = .900):
+def _await_connection(port, stop, timeout = .500):
 
     request_buffer, response_buffer = array.array('B'), array.array('B')
 
@@ -497,9 +497,7 @@ def _await_connection(port, stop, timeout = .900):
 class VirtualStenotypeStentura(VirtualStenotypeBase):
     """Stentura interface.
 
-    This class implements the three methods necessary for a standard
-    stenotype interface: start_capture, stop_capture, and
-    add_callback.
+    This class implements the send method.
     """
 
     def __init__(self, params):

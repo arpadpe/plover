@@ -40,7 +40,7 @@ class MachineInputBase(object):
 		return "Input:"
 	
 	def _error(self, msg):
-		raise InputError(msg)
+		raise Exception(msg)
 
 	def __repr__(self):
 		return "MachineInputBase()"
@@ -55,22 +55,28 @@ class MachineInputFile(MachineInputBase):
 		self.delimiter = delimiter if delimiter is not None else '\n'
 		MachineInputBase.__init__(self)	
 		
-	def start_input(self, done):
-		time.sleep(5)
+	def start_input(self):
 		try:
 			self.file = open(self.filename, 'r')
-		except IOError as e:
+		except Exception:
 			self._error("File could not be opened")	
+
+		# wait 1 second before reading the file
+		time=sleep(1)
+
 		for line in self.file:
 			for outline in line.strip().split(self.delimiter):
 				if outline:
 					for input in outline.strip().split('/'):
 						if input:
 							self._notify(input)
-		done()
 					
 	def stop_input(self):
-		self.file.close()
+		try:
+			self.file.close()
+		except Exception:
+			# file could not be opened
+			pass
 	
 	def get_info(self):
 		return "Input: File input \nfile: {}".format(self.filename)
@@ -90,11 +96,15 @@ class MachineInputNetwork(MachineInputBase):
 		except Exception, e:
 			self._error("Could not start network\n%s" % e)
 		
-	def start_input(self, done):
+	def start_input(self):
 		self.server.start()
 		
 	def stop_input(self):
-		self.server.stop()
+		try:
+			self.server.stop()
+		except Exception:
+			# thrown if no server started
+			pass
 		
 	def get_host(self):
 		return self.HOST
@@ -122,15 +132,22 @@ class MachineInputPhysical(MachineInputBase):
 		except NoSuchMachineException as e:
 			raise InvalidConfigurationError(unicode(e))	
 		
-	def start_input(self, done):
+	def start_input(self):
 		self.machine.add_stroke_callback(lambda keys: self._notify(' '.join(keys)))
 		self.machine.start_capture()
 
 	def stop_input(self):
-		self.machine.stop_capture()
+		try:
+			self.machine.stop_capture()
+		except Exception as e:
+			# thrown if no machine configured
+			pass
 	
 	def get_info(self):
-		return "Input: Machine input \nMachine type: {}".format(self.machine_type)
+		if 'port' in self.machine_options:
+			return "Input: Machine input \nMachine type: %s\nSerial Port: %s" % (self.machine_type, self.machine_options['port'])
+		else:
+			return "Input: Machine input \nMachine type: %s" % (self.machine_type)
 
 	def __repr__(self):
 		return "MachineInputPhysical(%s, %s)" % (self.machine_type, ",".join(self.machine_options))
