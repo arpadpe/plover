@@ -24,12 +24,19 @@ class VirtualStenotypeBase(object):
 		if self.serial_port:
 			self.serial_port.close()
 			
-		print self.serial_params
 		try:
 			self.serial_port = serial.Serial(**self.serial_params)
 		except (serial.SerialException, OSError, TypeError) as e:
 			self._error("Could not start serial port")
 			return
+		except Exception, e:
+			try:
+				self.serial_params['rtscts'] = True
+				self.serial_params['dsrdtr'] = True
+				self.serial_port = serial.Serial(**self.serial_params)
+			except Exception, e:
+				self._error()
+	    		return
 		if self.serial_port is None or not self.serial_port.isOpen():
 			self._error("Could not start serial port")
 			

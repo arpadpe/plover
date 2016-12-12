@@ -62,7 +62,7 @@ class MachineInputFile(MachineInputBase):
 			self._error("File could not be opened")	
 
 		# wait 1 second before reading the file
-		time=sleep(1)
+		time.sleep(1)
 
 		for line in self.file:
 			for outline in line.strip().split(self.delimiter):

@@ -185,11 +185,20 @@ class SerialStenotypeBase(ThreadedStenotypeBase):
         self._close_port()
 
         try:
+            print self.serial_params
             self.serial_port = serial.Serial(**self.serial_params)
         except (serial.SerialException, OSError):
             log.warning('Can\'t open serial port', exc_info=True)
             self._error()
             return
+        except Exception, e:
+            try:
+                self.serial_params['rtscts'] = True
+                self.serial_params['dsrdtr'] = True
+                self.serial_port = serial.Serial(**self.serial_params)
+            except Exception, e:
+                self._error()
+                return
 
         if not self.serial_port.isOpen():
             log.warning('Serial port is not open: %s', self.serial_params.get('port'))

@@ -44,7 +44,7 @@ def enumerate_ports():
     if len(ports) > 0:
         return ports
     else:
-        return sorted(x for x in glob.glob('/dev/tty[A-Za-z]*'))
+        return sorted(x for x in glob.glob('/dev/tty[A-Za-z]*') + glob.glob('/tmp/tty[A-Za-z]*'))
 
 class SerialConfigDialog(wx.Dialog):
     """Serial port configuration dialog."""

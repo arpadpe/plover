@@ -45,7 +45,7 @@ class OutputHandler(object):
 			if self.backspace:
 				self.keyboard_control.send_backspaces(number_of_backspaces)
 			else:
-				self.keyboard_control.send_string('*')
+				self.keyboard_control.send_string(unicode('*'))
 
 	def send_string(self, s):
 		if self.keyboard_control is not None:
