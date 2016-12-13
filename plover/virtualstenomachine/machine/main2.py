@@ -1,17 +1,25 @@
 #!/usr/bin/env python
 
-from machineinput import MachineInputFile as Input
-import machineinput
+#from machineinput import MachineInputFile as Input
+#import machineinput
 from machinenetwork import StenoMachineClient
+from machinenetwork import StenoMachineServer
 import machinenetwork
 
 def printinput(string):
 	print string
 
-client = StenoMachineClient(machinenetwork.DEFAULT_HOST, machinenetwork.DEFAULT_PORT)
+#client = StenoMachineClient(machinenetwork.DEFAULT_HOST, machinenetwork.DEFAULT_PORT)
 
-client.send("alma")
+#client.send("alma")
 
+server = StenoMachineServer(machinenetwork.DEFAULT_HOST, machinenetwork.DEFAULT_PORT, printinput)
+
+server.start()
+
+while True:
+	#run
+	pass
 
 '''
 try:

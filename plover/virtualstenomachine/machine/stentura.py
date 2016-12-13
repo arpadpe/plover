@@ -151,6 +151,7 @@ import itertools
 import struct
 import time
 import threading
+import Queue
 
 from plover.virtualstenomachine.machine.base import VirtualStenotypeBase
 
@@ -478,20 +479,51 @@ def _write_to_port(port, data):
     while data:
         data = buffer(data, port.write(data))
 
-def _await_connection(port, stop, timeout = .500):
 
-    request_buffer, response_buffer = array.array('B'), array.array('B')
+def _loop(port, q, timeout=.500):
+    """Loop to a requester
+    Send strokes when available.
 
+    Send empty return packets at a given interval when no new strokes (usually 500ms).
+
+    Args:
+    - port: The serial port.
+    - q: The queue used for the strokes.
+    - timeout: The timeout between empty heartbeat response packets.
+    """
+    request_buffer, response_buffer, data_buffer = array.array('B'), array.array('B'), array.array('B')
+    
     while True:
-        if not port.isOpen():
-            break
         packet = _read_packet(port, request_buffer)
-        response = _make_response(response_buffer, _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0], ord(packet[1]))
-        _write_to_port(port, response)
+        if _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0] == _OPEN:
+            response = _make_response(response_buffer, _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0], ord(packet[1]),)
+            _write_to_port(port, response)
 
-        stop.wait(timeout)
+            # expected a full read to the end of file
+            packet = _read_packet(port, request_buffer)
+            response = _make_response(response_buffer, _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0], ord(packet[1]))
+            _write_to_port(port, response)
 
+        elif _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0] == _READC:
+            try:
+                key_sets = q.get(block=True, timeout=timeout)
+                data_buffer = array.array('B')
+                _write_to_buffer(data_buffer, 0, key_sets)
 
+                # don't send huge amounts in one packet
+                while not q.empty() and len(data_buffer) < 256:
+                    key_sets = q.get()
+                    _write_to_buffer(data_buffer, len(data_buffer), key_sets)
+                response = _make_response(response_buffer, _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0], ord(packet[1]), p1=len(data_buffer), data=data_buffer)
+                _write_to_port(port, response)
+
+                # Send a packet with p1=0 to signal end of strokes
+                packet = _read_packet(port, request_buffer)
+                response = _make_response(response_buffer, _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0], ord(packet[1]))
+                _write_to_port(port, response)
+            except Queue.Empty:
+                response = _make_response(response_buffer, _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0], ord(packet[1]))
+                _write_to_port(port, response)
 
 
 class VirtualStenotypeStentura(VirtualStenotypeBase):
@@ -509,8 +541,9 @@ class VirtualStenotypeStentura(VirtualStenotypeBase):
         VirtualStenotypeBase.start(self)
 
         try:
-            self.stopthread = threading.Event()
-            t = threading.Thread(target=_await_connection, args=(self.serial_port, self.stopthread))
+            self.q = Queue.Queue()
+            t = threading.Thread(target=_loop, args=(self.serial_port, self.q))
+            t.daemon = True
             t.start()
         except _StopException:
             pass
@@ -542,33 +575,7 @@ class VirtualStenotypeStentura(VirtualStenotypeBase):
                     elif self._add_to_key_sets(char + '-'):
                         continue
 
-        port = self.serial_port
-        request_buffer, response_buffer, data_buffer = array.array('B'), array.array('B'), array.array('B')
-
-        packet = _read_packet(port, request_buffer)
-        if _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0] == _OPEN:
-        	response = _make_response(response_buffer, _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0], ord(packet[1]),)
-        	_write_to_port(port, response)
-        	packet = _read_packet(port, request_buffer)
-        	response = _make_response(response_buffer, _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0], ord(packet[1]))
-        	_write_to_port(port, response)
-        	packet = _read_packet(port, request_buffer)
-        	data_buffer = array.array('B')
-        	_write_to_buffer(data_buffer, 0, self.key_sets)
-        	response = _make_response(response_buffer, _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0], ord(packet[1]), p1=len(data_buffer), data=data_buffer)
-        	_write_to_port(port, response)
-        elif _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0] == _READC:
-        	data_buffer = array.array('B')
-        	_write_to_buffer(data_buffer, 0, self.key_sets)
-        	response = _make_response(response_buffer, _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0], ord(packet[1]), p1=len(data_buffer), data=data_buffer)
-        	_write_to_port(port, response)
-        else:
-        	return
-        	
-        # Send a packet with p1=0 to signal end of strokes
-        packet = _read_packet(port, request_buffer)
-        response = _make_response(response_buffer, _SHORT_STRUCT.unpack(buffer(packet, 4, 2))[0], ord(packet[1]))
-        _write_to_port(port, response)
+        self.q.put(self.key_sets)
 
     def _add_to_key_sets(self, key):
         if key not in _STENO_KEY_CHART:
