@@ -49,7 +49,6 @@ class MachineOutputSerial(MachineOutputBase):
 			self._error(e)
 		
 	def start(self):
-		print self.machine
 		self.machine.start()
 
 	def stop(self):

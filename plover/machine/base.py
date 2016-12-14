@@ -185,7 +185,6 @@ class SerialStenotypeBase(ThreadedStenotypeBase):
         self._close_port()
 
         try:
-            print self.serial_params
             self.serial_port = serial.Serial(**self.serial_params)
         except (serial.SerialException, OSError):
             log.warning('Can\'t open serial port', exc_info=True)

@@ -151,21 +151,6 @@ class MainFrame(wx.Frame):
 			self.stop_button.Enable()
 		except Exception as e:
 			self._show_alert(unicode(e))
-			self._quit()
-		
-
-		'''try:
-			app.init_engine(self.steno_engine, self.config)
-			break
-		except Exception as e:
-			self._show_alert(unicode(e))
-			dlg = ConfigurationDialog(self.steno_engine, self.config, parent=self)
-			ret = dlg.ShowModal()
-			if ret == wx.ID_CANCEL:
-				self._quit()
-				return
-		pass
-		'''
 		
 	def _stop_machine(self, event=None):
 		"""Called when the stop button is clicked."""
