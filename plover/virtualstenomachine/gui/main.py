@@ -607,7 +607,8 @@ class VirtualSerialConfigDialog(wx.Dialog):
 		self.parent = parent
 
 		pos = (400, 400)
-		wx.Dialog.__init__(self, parent, title=self.CONFIGURATION_TITLE, pos=pos, style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
+		size = wx.Size(400, 200)
+		wx.Dialog.__init__(self, parent, title=self.CONFIGURATION_TITLE, pos=pos, size=size, style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
 
 		ports = machineserial.get_default_ports()
 
@@ -645,5 +646,6 @@ class VirtualSerialConfigDialog(wx.Dialog):
 			try:
 				machineserial.create_serial_port(self.port1_textctrl.GetValue(), self.port2_textctrl.GetValue())
 				self.parent._show_alert("Virtual serial ports created")
+				self.Destroy()
 			except Exception as e:
 				self.parent._show_error_alert(e.value)

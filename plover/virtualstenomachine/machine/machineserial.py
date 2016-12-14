@@ -3,8 +3,8 @@
 import sys
 import os
 import subprocess
-
-socat_port = None
+import threading
+import time
 
 def create_serial_port(port1, port2):
 	if os.path.isfile(port1):
@@ -16,15 +16,24 @@ def create_serial_port(port1, port2):
 	if sys.platform.startswith('win32'):
 		return
 	elif sys.platform.startswith('linux'):
-		try:
-			args = ['socat', '-d', '-d', 'pty,raw,echo=0,link='+str(port1), 'pty,raw,echo=0,link='+str(port2)]
-			socat_port = subprocess.Popen(args)		
-		except:
-			raise SerialError("Error creating ports.")
+		t = threading.Thread(target=_start_socat, args=(port1, port2))
+        t.daemon = True
+        t.start()
+
+        time.sleep(1)
+
+        if not t.isAlive():
+        	raise SerialError("Error creating ports.")
+
 	elif sys.platform.startswith('darwin'):
 		# TODO
 		pass
 		
+def _start_socat(port1, port2):
+	args = ['socat', 'pty,raw,echo=0,link='+str(port1), 'pty,raw,echo=0,link='+str(port2)]
+	child = subprocess.Popen(args, stdout=subprocess.PIPE)
+	out,err = child.communicate()
+
 def virtual_serial_ports_available():
 	if sys.platform.startswith('win32'):
 		return False
