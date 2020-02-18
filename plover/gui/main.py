@@ -19,7 +19,9 @@ from plover.config import ASSETS_DIR, SPINNER_FILE, copy_default_dictionaries
 from plover.gui.config import ConfigurationDialog
 import plover.gui.add_translation
 import plover.gui.lookup
+import plover.gui.output_flow
 from plover.oslayer.keyboardcontrol import KeyboardEmulation
+from plover.oslayer.outputcontrol import OutputHandler
 from plover.machine.base import STATE_ERROR, STATE_INITIALIZING, STATE_RUNNING
 from plover.machine.registry import machine_registry
 from plover.gui.paper_tape import StrokeDisplayDialog
@@ -218,15 +220,20 @@ class MainFrame(wx.Frame):
             self.config.clear()
         copy_default_dictionaries(self.config)
 
+        self.steno_engine = app.StenoEngine()
+
         rect = wx.Rect(config.get_main_frame_x(), config.get_main_frame_y(), *self.GetSize())
         self.SetRect(AdjustRectToScreen(rect))
 
-        self.steno_engine = app.StenoEngine()
         self.steno_engine.add_callback(
             lambda s: wx.CallAfter(self._update_status, s))
-        self.steno_engine.set_output(
-            Output(self.consume_command, self.steno_engine))
 
+        flows_count = self.config.get_flows_count()
+
+        self.windows_handles_filename = config.get_windows_handles_filename()
+
+        self._update_flows(self.steno_engine, self.config)
+        
         self.steno_engine.add_stroke_listener(
             StrokeDisplayDialog.stroke_handler)
         if self.config.get_show_stroke_display():
@@ -248,6 +255,27 @@ class MainFrame(wx.Frame):
             app.reset_machine(self.steno_engine, self.config)
         except Exception:
             log.error('machine reset failed', exc_info=True)
+			
+    def _update_flows(self, engine, config):
+        flows_count = config.get_flows_count()
+
+        engine.clear_flows()
+
+        for i in range(0, flows_count):
+            engine.increment_flows()
+
+            output_set = True
+            if config.get_output_window(i) == config.DEFAULT_OUTPUT_WINDOW:
+                output = Output(self.consume_command, engine)
+            else:
+                output = WindowOutput(self.consume_command, 
+                                         engine, 
+                                         config.get_output_send_backspaces(i), 
+                                         self.windows_handles_filename)
+                
+                output_set = output.set_output_window(config.get_output_window(i))
+            output.set_enabled(output_set and config.get_output_enabled(i))
+            engine.set_flow_output(i, output)
 
     def consume_command(self, command):
         # The first commands can be used whether plover has output enabled or not.
@@ -367,6 +395,7 @@ class Output(object):
         self.engine_command_callback = engine_command_callback
         self.keyboard_control = KeyboardEmulation()
         self.engine = engine
+        self.enabled = True
 
     def _xcall(self, fn, *args, **kwargs):
         try:
@@ -374,17 +403,55 @@ class Output(object):
         except Exception:
             log.error('output failed', exc_info=True)
 
+    def set_enabled(self, enabled):
+        self.enabled = enabled
+
     def send_backspaces(self, b):
-        wx.CallAfter(self._xcall, self.keyboard_control.send_backspaces, b)
+        if self.enabled:
+            wx.CallAfter(self._xcall, self.keyboard_control.send_backspaces, b)
 
     def send_string(self, t):
-        wx.CallAfter(self._xcall, self.keyboard_control.send_string, t)
+        if self.enabled:
+            wx.CallAfter(self._xcall, self.keyboard_control.send_string, t)
 
     def send_key_combination(self, c):
-        wx.CallAfter(self._xcall, self.keyboard_control.send_key_combination, c)
+        if self.enabled:
+            wx.CallAfter(self._xcall, self.keyboard_control.send_key_combination, c)
 
     # TODO: test all the commands now
     def send_engine_command(self, c):
-        result = self.engine_command_callback(c)
-        if result and not self.engine.is_running:
-            self.engine.machine.suppress_last_stroke(self.send_backspaces)
+        if self.enabled:
+            result = self.engine_command_callback(c)
+            if result and not self.engine.is_running:
+                self.engine.machine.suppress_last_stroke(self.send_backspaces)
+
+class WindowOutput(object):
+    def __init__(self, engine_command_callback, engine, backspace = True, filename = None):
+        self.engine_command_callback = engine_command_callback
+        self.output_control = OutputHandler(backspace, filename)
+        self.engine = engine
+        self.enabled = True
+
+    def set_output_window(self, window):
+        return self.output_control.set_output_location(window)
+
+    def set_enabled(self, enabled):
+        self.enabled = enabled
+
+    def send_backspaces(self, n):
+        if self.enabled:
+            wx.CallAfter(self.output_control.send_backspaces, n)
+
+    def send_string(self, t):
+        if self.enabled:
+            wx.CallAfter(self.output_control.send_string, t)
+
+    def send_key_combination(self, c):
+        if self.enabled:
+            wx.CallAfter(self.output_control.send_key_combination, c)
+
+    def send_engine_command(self, c):
+        if self.enabled:
+            result = self.engine_command_callback(c)
+            if result and not self.engine.is_running:
+                self.engine.machine.suppress_last_stroke(self.send_backspaces)

@@ -12,6 +12,7 @@ import wx
 import wx.animate
 from wx.lib.utils import AdjustRectToScreen
 from threading import Thread
+import glob
 
 from plover.config import SPINNER_FILE
 
@@ -39,7 +40,11 @@ GLOBAL_BORDER = 4
 
 def enumerate_ports():
     """Enumerates available ports"""
-    return sorted(x[0] for x in comports())
+    ports = sorted(x[0] for x in comports()) 
+    if len(ports) > 0:
+        return ports
+    else:
+        return sorted(x for x in glob.glob('/dev/tty[A-Za-z]*') + glob.glob('/tmp/tty[A-Za-z]*'))
 
 class SerialConfigDialog(wx.Dialog):
     """Serial port configuration dialog."""

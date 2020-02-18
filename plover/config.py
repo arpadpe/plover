@@ -140,6 +140,24 @@ DEFAULT_SYSTEM = 'English Stenotype'
 SYSTEM_CONFIG_SECTION = 'System: %s'
 SYSTEM_KEYMAP_OPTION = 'keymap[%s]'
 
+MULTIPLE_OUTPUT_CONFIG_SECTION = 'Multiple Output Configuration'
+MULTIPLE_OUTPUT_OPTION = 'multiple_output'
+DEFAULT_MULTIPLE_OUTPUT = False
+FLOWS_COUNT = 'flows_count'
+DEFAULT_FLOWS_COUNT = 1
+OUTPUT_TRANSLATED = 'output_translated'
+DEFAULT_OUTPUT_TRANSLATED = True
+OUTPUT_SEND_BACKSPACES = 'output_send_backspaces'
+DEFAULT_OUTPUT_SEND_BACKSPACES = True
+OUTPUT_DICTIONARY_ORDER_REVERSED = 'output_dict_order_reversed'
+DEFAULT_OUTPUT_DICTIONARY_ORDER_REVERSED = False
+OUTPUT_ENABLED = 'output_enabled'
+DEFAULT_OUTPUT_ENABLED = True
+OUTPUT_WINDOW = 'output_window'
+DEFAULT_OUTPUT_WINDOW = 'Focus window'
+WINDOWS_HANDLES_FILE_OPTION = 'windows_handles_file'
+DEFAULT_WINDOWS_HANDLES_FILE = os.path.join(ASSETS_DIR, 'windowshandles.json')
+
 # Dictionary constants.
 JSON_EXTENSION = '.json'
 RTF_EXTENSION = '.rtf'
@@ -165,6 +183,8 @@ def raise_if_invalid_opacity(opacity):
 # TODO: Unit test this class
 
 class Config(object):
+
+    DEFAULT_OUTPUT_WINDOW = DEFAULT_OUTPUT_WINDOW
 
     def __init__(self):
         self._config = configparser.RawConfigParser()
@@ -537,6 +557,71 @@ class Config(object):
         else:
             mappings = dict(json.loads(mappings))
         return mappings
+							 
+    def set_multiple_output(self, multiple_output):
+        self._set(MULTIPLE_OUTPUT_CONFIG_SECTION, MULTIPLE_OUTPUT_OPTION,
+                  multiple_output)
+
+    def get_multiple_output(self):
+        return self._get_bool(MULTIPLE_OUTPUT_CONFIG_SECTION, 
+                              MULTIPLE_OUTPUT_OPTION,
+                              DEFAULT_MULTIPLE_OUTPUT)
+
+    def set_flows_count(self, count):
+        self._set(MULTIPLE_OUTPUT_CONFIG_SECTION, FLOWS_COUNT, count)
+
+    def get_flows_count(self):
+        return self._get_int(MULTIPLE_OUTPUT_CONFIG_SECTION, 
+                              FLOWS_COUNT,
+                              DEFAULT_FLOWS_COUNT)
+
+    def set_output_enabled(self, enabled, index):
+        self._set(MULTIPLE_OUTPUT_CONFIG_SECTION, OUTPUT_ENABLED + str(index), enabled)
+
+    def get_output_enabled(self, index):
+        return self._get_bool(MULTIPLE_OUTPUT_CONFIG_SECTION,
+                              OUTPUT_ENABLED + str(index),
+                              DEFAULT_OUTPUT_ENABLED)
+
+    def set_output_translated(self, translated, index):
+        self._set(MULTIPLE_OUTPUT_CONFIG_SECTION, OUTPUT_TRANSLATED + str(index), translated)
+
+    def get_output_translated(self, index):
+        return self._get_bool(MULTIPLE_OUTPUT_CONFIG_SECTION,
+                              OUTPUT_TRANSLATED + str(index),
+                              DEFAULT_OUTPUT_TRANSLATED)
+
+    def set_output_dictionary_order_reversed(self, order_reversed, index):
+        self._set(MULTIPLE_OUTPUT_CONFIG_SECTION, OUTPUT_DICTIONARY_ORDER_REVERSED + str(index), order_reversed)
+
+    def get_output_dictionary_order_reversed(self, index):
+        return self._get_bool(MULTIPLE_OUTPUT_CONFIG_SECTION,
+                              OUTPUT_DICTIONARY_ORDER_REVERSED + str(index),
+                              DEFAULT_OUTPUT_DICTIONARY_ORDER_REVERSED)
+
+    def set_output_send_backspaces(self, send_backspaces, index):
+        self._set(MULTIPLE_OUTPUT_CONFIG_SECTION, OUTPUT_SEND_BACKSPACES + str(index), send_backspaces)
+
+    def get_output_send_backspaces(self, index):
+        return self._get_bool(MULTIPLE_OUTPUT_CONFIG_SECTION,
+                              OUTPUT_SEND_BACKSPACES + str(index),
+                              DEFAULT_OUTPUT_SEND_BACKSPACES)
+
+    def set_output_window(self, window, index):
+        self._set(MULTIPLE_OUTPUT_CONFIG_SECTION, OUTPUT_WINDOW + str(index), window)
+
+    def get_output_window(self, index):
+        return self._get(MULTIPLE_OUTPUT_CONFIG_SECTION,
+                         OUTPUT_WINDOW + str(index),
+                         DEFAULT_OUTPUT_WINDOW)
+
+    def set_windows_handles_filename(self, filename):
+        self._set(MULTIPLE_OUTPUT_CONFIG_SECTION, WINDOWS_HANDLES_FILE_OPTION, filename)
+
+    def get_windows_handles_filename(self):
+        return self._get(MULTIPLE_OUTPUT_CONFIG_SECTION,
+                         WINDOWS_HANDLES_FILE_OPTION,
+                         DEFAULT_WINDOWS_HANDLES_FILE)
 
     def _set(self, section, option, value):
         if not self._config.has_section(section):
